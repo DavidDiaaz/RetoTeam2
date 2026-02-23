@@ -13,6 +13,7 @@ Proyecto para la materia: **Modelación de sistemas multiagentes con gráficas c
 * Pablo Javier Arreola Velasco (A01747824)
 
 ## Documento en Tag REVISION-2
+[Descargar PDF de la Evidencia](./Evidencia_2_Revision_1_y_2.pdf)
 
 ## Herramientas de Trabajo
 * **Comunicación:** WhatsApp y Zoom.
