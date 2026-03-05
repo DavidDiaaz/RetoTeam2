@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 66e912925e77ab046abd88899596b035
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 242670
+  packageName: Sci-Fi Cyberpunk City Environment with Road System and Skyscrapers
+    - Cityscape
+  packageVersion: 1.0.0
+  assetPath: Assets/Low_Poly_Sci-fi_City/Roads_Pack/Prefabs/Road_with_StreetLights/8LinesBlueRed/Bridge(Turn(8)).prefab
+  uploadId: 680759

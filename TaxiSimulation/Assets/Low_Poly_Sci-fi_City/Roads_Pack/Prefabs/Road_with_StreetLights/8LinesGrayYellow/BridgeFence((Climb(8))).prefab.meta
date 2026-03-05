@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 0640b75e54dd2c54cafca0096b3c06c4
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 242670
+  packageName: Sci-Fi Cyberpunk City Environment with Road System and Skyscrapers
+    - Cityscape
+  packageVersion: 1.0.0
+  assetPath: Assets/Low_Poly_Sci-fi_City/Roads_Pack/Prefabs/Road_with_StreetLights/8LinesGrayYellow/BridgeFence((Climb(8))).prefab
+  uploadId: 680759

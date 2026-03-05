@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: d00e3f10d40333745b616f9e32028bdd
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 242670
+  packageName: Sci-Fi Cyberpunk City Environment with Road System and Skyscrapers
+    - Cityscape
+  packageVersion: 1.0.0
+  assetPath: Assets/Low_Poly_Sci-fi_City/Roads_Pack/Prefabs/Road_with_StreetLights/TransitionsBlueRed/Bridge(4_8).prefab
+  uploadId: 680759
