@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 817d29c8d6116f6478a8beb6d2a9c5dd
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 242670
+  packageName: Sci-Fi Cyberpunk City Environment with Road System and Skyscrapers
+    - Cityscape
+  packageVersion: 1.0.0
+  assetPath: Assets/Low_Poly_Sci-fi_City/Buildings_Pack/Prefabs/Buildings/StudioGrenBuilding_1.prefab
+  uploadId: 680759
