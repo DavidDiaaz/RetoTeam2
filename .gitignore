@@ -1,4 +1,7 @@
-/TaxiSimulation/Assets/Editor
+# =========================
+# Unity Generated Folders
+# =========================
+
 [Ll]ibrary/
 [Tt]emp/
 [Oo]bj/
@@ -6,17 +9,13 @@
 [Bb]uilds/
 [Ll]ogs/
 UserSettings/
-
-# MemoryCaptures
 MemoryCaptures/
+_Recovery/
 
-# Asset meta data
-*.pidb
-*.booproj
-*.svd
-*.pdb
+# =========================
+# Unity / IDE Generated Files
+# =========================
 
-# Unity generated
 *.csproj
 *.unityproj
 *.sln
@@ -24,3 +23,34 @@ MemoryCaptures/
 *.tmp
 *.user
 *.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+
+# Unity cache
+*.apk
+*.aab
+
+# =========================
+# Visual Studio Code
+# =========================
+
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+
+# =========================
+# OS Files
+# =========================
+
+.DS_Store
+Thumbs.db
+
+# =========================
+# Crash Logs
+# =========================
+
+sysinfo.txt
