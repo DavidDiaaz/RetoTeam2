@@ -16,11 +16,11 @@ public class PassengerAgent : MonoBehaviour
     public float maxWaitTime = 30f;
 
     private float waitTimer = 0f;
-    private FleetDispatcher dispatcher;
+    private DispatcherAgent dispatcher;
 
     void Start()
     {
-        dispatcher = FindFirstObjectByType<FleetDispatcher>();
+        dispatcher = FindFirstObjectByType<DispatcherAgent>();
 
         if (pickupPoint  == null) pickupPoint  = transform;
         if (dropoffPoint == null) dropoffPoint = transform;

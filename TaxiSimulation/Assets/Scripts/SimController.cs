@@ -1,3 +1,32 @@
+// ============================================================================
+// SimController.cs — Controlador Principal de la Simulación
+// ============================================================================
+//
+// DESCRIPCIÓN:
+//   Controlador central que inicializa y gestiona la simulación de tráfico.
+//   Spawnea vehículos de tráfico, taxis y pasajeros. Muestra una interfaz
+//   GUI con el estado de la simulación en tiempo real.
+//
+// INTEGRACIÓN CON BDI:
+//   Este controlador trabaja con el sistema multiagente BDI:
+//   • DispatcherAgent — Coordina asignaciones de taxis (reemplaza FleetDispatcher)
+//   • TaxiAgent — Agentes taxi con deliberación BDI
+//   • TrafficManager — Proveedor de estado del tráfico
+//
+// USO EN UNITY:
+//   1. Agregar a un GameObject vacío en la escena
+//   2. Configurar prefabs de tráfico y taxi en el Inspector
+//   3. Ajustar zona de spawn (spawnAreaMin/Max)
+//   4. Asegurarse de que existe un GameObject con DispatcherAgent
+//   5. Asegurarse de que existe un GameObject con TrafficManager
+//      (si no existe, se crea automáticamente)
+//
+// CONTROLES:
+//   SPACE    = Pausa / Reanudar
+//   1, 2, 3  = Velocidad x1, x2, x3
+//
+// ============================================================================
+
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -5,6 +34,10 @@ using UnityEngine.AI;
 
 public class SimController : MonoBehaviour
 {
+    // ─────────────────────────────────────────────
+    // CONFIGURACIÓN
+    // ─────────────────────────────────────────────
+
     [Header("Tráfico")]
     [Tooltip("Prefabs de tráfico: sedan-sports, cybertruck, delivery-flat, police...")]
     public GameObject[] trafficPrefabs;
@@ -29,11 +62,15 @@ public class SimController : MonoBehaviour
     public Vector3 spawnAreaMax = new Vector3( 50f, 0f,  50f);
     public float   navMeshSearchRadius = 20f;
 
+    // ─────────────────────────────────────────────
+    // ESTADO INTERNO
+    // ─────────────────────────────────────────────
+
     private int tripsCompleted = 0;
     private int tripsCancelled = 0;
     private int passengerCount = 0;
 
-    private FleetDispatcher dispatcher;
+    private DispatcherAgent dispatcher;
     private TaxiAgent[]     taxis;
 
     private GUIStyle boxStyle;
@@ -41,9 +78,29 @@ public class SimController : MonoBehaviour
     private GUIStyle bigLabelStyle;
     private GUIStyle taxiStyle;
 
+    // ─────────────────────────────────────────────
+    // INICIALIZACIÓN
+    // ─────────────────────────────────────────────
+
     void Start()
     {
-        dispatcher = FindFirstObjectByType<FleetDispatcher>();
+        // Buscar o crear el DispatcherAgent
+        dispatcher = FindFirstObjectByType<DispatcherAgent>();
+        if (dispatcher == null)
+        {
+            Debug.LogWarning("[SimController] No se encontró DispatcherAgent en la escena. " +
+                             "Creando uno automáticamente...");
+            GameObject dispObj = new GameObject("DispatcherAgent");
+            dispatcher = dispObj.AddComponent<DispatcherAgent>();
+        }
+
+        // Buscar o crear el TrafficManager
+        if (TrafficManager.Instance == null)
+        {
+            GameObject tmObj = new GameObject("TrafficManager");
+            tmObj.AddComponent<TrafficManager>();
+            Debug.Log("[SimController] TrafficManager creado automáticamente.");
+        }
 
         SpawnTraffic();
         SpawnTaxis();
@@ -53,6 +110,10 @@ public class SimController : MonoBehaviour
         if (spawnPassengers)
             StartCoroutine(SpawnPassengersRoutine());
     }
+
+    // ─────────────────────────────────────────────
+    // SPAWN DE VEHÍCULOS
+    // ─────────────────────────────────────────────
 
     void SpawnTraffic()
     {
@@ -101,9 +162,13 @@ public class SimController : MonoBehaviour
             TaxiAgent agent = taxi.GetComponent<TaxiAgent>();
             if (agent == null) agent = taxi.AddComponent<TaxiAgent>();
             agent.taxiId    = taxi.name;
-            agent.moveSpeed = taxiSpeed; // todos con la misma velocidad
+            agent.moveSpeed = taxiSpeed;
         }
     }
+
+    // ─────────────────────────────────────────────
+    // SPAWN DE PASAJEROS
+    // ─────────────────────────────────────────────
 
     IEnumerator SpawnPassengersRoutine()
     {
@@ -175,6 +240,10 @@ public class SimController : MonoBehaviour
         agent.maxWaitTime  = 30f;
     }
 
+    // ─────────────────────────────────────────────
+    // UTILIDADES
+    // ─────────────────────────────────────────────
+
     bool TryGetNavMeshPoint(out Vector3 result)
     {
         for (int attempt = 0; attempt < 10; attempt++)
@@ -197,6 +266,10 @@ public class SimController : MonoBehaviour
         return false;
     }
 
+    // ─────────────────────────────────────────────
+    // CONTROLES DE SIMULACIÓN
+    // ─────────────────────────────────────────────
+
     void Update()
     {
         if (Input.GetKeyDown(KeyCode.Space))
@@ -207,28 +280,53 @@ public class SimController : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.Alpha3)) Time.timeScale = 3f;
     }
 
+    // ─────────────────────────────────────────────
+    // INTERFAZ GUI
+    // ─────────────────────────────────────────────
+
     void OnGUI()
     {
         if (boxStyle == null) InitStyles();
 
         GUI.Box(new Rect(20, 20, 700, 700), "", boxStyle);
-        GUI.Label(new Rect(40, 30,  400, 40), "ROBOTAXI SIMULATOR",                      titleStyle);
+        GUI.Label(new Rect(40, 30,  400, 40), "ROBOTAXI SIMULATOR — BDI",                titleStyle);
         GUI.Label(new Rect(40, 80,  380, 30), $"Velocidad: x{Time.timeScale:F0}",        bigLabelStyle);
         GUI.Label(new Rect(40, 110, 380, 30), $"Viajes completados: {tripsCompleted}",   bigLabelStyle);
         GUI.Label(new Rect(40, 140, 380, 30), $"Viajes cancelados: {tripsCancelled}",    bigLabelStyle);
         GUI.Label(new Rect(40, 170, 380, 30), $"Pasajeros activos: {passengerCount}",    bigLabelStyle);
-        GUI.Label(new Rect(40, 210, 380, 30), "ESTADO DE TAXIS:",                        titleStyle);
 
-        float y = 245;
+        // Mostrar estado del Dispatcher BDI
+        if (dispatcher != null)
+        {
+            GUI.Label(new Rect(40, 200, 500, 30),
+                $"Dispatcher: {dispatcher.dispatcherState}  (Ciclos BDI: {dispatcher.BDICycleCount})",
+                bigLabelStyle);
+        }
+
+        GUI.Label(new Rect(40, 240, 380, 30), "ESTADO DE TAXIS (BDI):",                  titleStyle);
+
+        float y = 275;
         if (taxis != null)
         {
             foreach (var taxi in taxis)
             {
                 if (taxi == null) continue;
                 taxiStyle.normal.textColor = StateToColor(taxi.state);
-                GUI.Label(new Rect(50, y, 350, 28), $"• {taxi.taxiId} → {taxi.state}", taxiStyle);
+                GUI.Label(new Rect(50, y, 600, 28),
+                    $"• {taxi.taxiId} → {taxi.state}  [BDI #{taxi.BDICycleCount}]",
+                    taxiStyle);
                 y += 28;
             }
+        }
+
+        // Mostrar info de TrafficManager
+        if (TrafficManager.Instance != null)
+        {
+            y += 10;
+            GUI.Label(new Rect(40, y, 500, 30),
+                $"Tráfico: {TrafficManager.Instance.TotalVehicles} vehículos, " +
+                $"{TrafficManager.Instance.CongestedZones} zonas congestionadas",
+                bigLabelStyle);
         }
 
         GUI.Label(new Rect(20, Screen.height - 40, 700, 30),
@@ -263,19 +361,25 @@ public class SimController : MonoBehaviour
         return t;
     }
 
+    /// <summary>
+    /// Mapeo de estado del taxi BDI a color para la GUI.
+    /// </summary>
     Color StateToColor(TaxiAgent.TaxiState s)
     {
         switch (s)
         {
-            case TaxiAgent.TaxiState.Disponible:     return Color.green;
-            case TaxiAgent.TaxiState.Asignado:       return Color.yellow;
-            case TaxiAgent.TaxiState.YendoAPickup:   return new Color(1f, 0.6f, 0f);
-            case TaxiAgent.TaxiState.EnViaje:        return Color.cyan;
-            case TaxiAgent.TaxiState.PasajeroABordo: return new Color(0f, 0.8f, 1f);
-            case TaxiAgent.TaxiState.Esperando:      return Color.red;
-            default:                                  return Color.white;
+            case TaxiAgent.TaxiState.Idle:                  return Color.green;
+            case TaxiAgent.TaxiState.GoingToPassenger:      return new Color(1f, 0.6f, 0f); // naranja
+            case TaxiAgent.TaxiState.TransportingPassenger: return Color.cyan;
+            case TaxiAgent.TaxiState.ReturningToZone:       return Color.yellow;
+            case TaxiAgent.TaxiState.Waiting:               return Color.red;
+            default:                                        return Color.white;
         }
     }
+
+    // ─────────────────────────────────────────────
+    // API PÚBLICA — Reportes de métricas
+    // ─────────────────────────────────────────────
 
     public void ReportTripCompleted() => tripsCompleted++;
     public void ReportTripCancelled() => tripsCancelled++;
