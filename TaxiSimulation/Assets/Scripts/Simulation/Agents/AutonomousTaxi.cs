@@ -66,6 +66,14 @@ public class AutonomousTaxi : VehicleAgent
             var next = plannedPath.Peek();
             if (next.from == node)
                 return plannedPath.Dequeue();
+
+            // Path desynced — taxi is at a node that doesn't match the next planned edge
+            UnityEngine.Debug.LogWarning(
+                $"[Taxi{Id}] Path desync at node {node.id}: " +
+                $"expected edge from {next.from.id}, resetting to Idle.");
+            plannedPath.Clear();
+            Passenger = null;
+            State     = TaxiState.Idle;
         }
 
         // Idle — roam randomly
