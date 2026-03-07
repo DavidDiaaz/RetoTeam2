@@ -103,13 +103,6 @@ public class AmbientDriver : VehicleAgent
         if (IsYieldingToMerger())
             desiredSpeed *= 1f - (profile.Kindness * 0.25f);
 
-        // Brake for red light
-        if (RedLightAhead)
-        {
-            float brakingSpeed = (float)Math.Sqrt(2f * 4f * Math.Max(0f, DistanceToEnd));
-            desiredSpeed = Math.Min(desiredSpeed, brakingSpeed);
-        }
-
         // Brake when must merge and running out of road
         if (MustMerge)
         {
@@ -118,12 +111,7 @@ public class AmbientDriver : VehicleAgent
                 desiredSpeed *= 1f - (urgency - 0.8f) * 2f;
         }
 
-        // Brake approaching blocked or contested intersection
-        if (TargetNode != null && (TargetNode.IsBlocked || IsYielding) && DistanceToEnd < 15f)
-        {
-            float brakingSpeed = (float)Math.Sqrt(2f * 4f * Math.Max(0f, DistanceToEnd));
-            desiredSpeed = Math.Min(desiredSpeed, brakingSpeed);
-        }
+        desiredSpeed = ApplyBrakingConstraints(desiredSpeed);
 
         Speed = MoveTowards(Speed, desiredSpeed, acceleration * world.DeltaTime);
     }
@@ -147,14 +135,4 @@ public class AmbientDriver : VehicleAgent
         return dist < Length * 3f && nearby.MustMerge;
     }
 
-    public override void Act(World world)
-    {
-        Move(world);
-    }
-
-    float MoveTowards(float current, float target, float maxDelta)
-    {
-        if (Math.Abs(target - current) <= maxDelta) return target;
-        return current + Math.Sign(target - current) * maxDelta;
-    }
 }

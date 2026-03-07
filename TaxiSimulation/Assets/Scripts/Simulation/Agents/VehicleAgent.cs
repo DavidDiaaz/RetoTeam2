@@ -99,6 +99,28 @@ public abstract class VehicleAgent : Agent
         return roadWeight + proximity + urgency;
     }
 
+    protected static float MoveTowards(float current, float target, float maxDelta)
+    {
+        if (Math.Abs(target - current) <= maxDelta) return target;
+        return current + Math.Sign(target - current) * maxDelta;
+    }
+
+    protected float ComputeBrakingSpeed(float distance, float deceleration = 4f)
+    {
+        return (float)Math.Sqrt(2f * deceleration * Math.Max(0f, distance));
+    }
+
+    protected float ApplyBrakingConstraints(float desired)
+    {
+        if (RedLightAhead)
+            desired = Math.Min(desired, ComputeBrakingSpeed(DistanceToEnd));
+
+        if (TargetNode != null && (TargetNode.IsBlocked || IsYielding) && DistanceToEnd < 15f)
+            desired = Math.Min(desired, ComputeBrakingSpeed(DistanceToEnd));
+
+        return desired;
+    }
+
     // ---------------------------------------------------------------
     public override void Act(World world)
     {

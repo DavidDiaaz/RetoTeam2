@@ -19,16 +19,6 @@ public class AutonomousTaxi : VehicleAgent
     float acceleration = 5f;
 
     // ---------------------------------------------------------------
-    // Neutral priority — no kindness penalty, urgency still builds
-    protected override float ComputePriority()
-    {
-        float roadWeight = CurrentLane.Edge.RoadClass == RoadClass.Primary ? 1f : 0f;
-        float proximity  = 1f - Math.Min(1f, DistanceToEnd / 20f);
-        float urgency    = Math.Min(1f, WaitTime / 10f);
-        return roadWeight + proximity + urgency;
-    }
-
-    // ---------------------------------------------------------------
     public override void Perceive(World world)
     {
         UpdatePerception(world);
@@ -102,29 +92,8 @@ public class AutonomousTaxi : VehicleAgent
             desiredSpeed = Math.Min(desiredSpeed, AheadOnLane.Speed * followFactor);
         }
 
-        if (RedLightAhead)
-        {
-            float brakingSpeed = (float)Math.Sqrt(2f * 4f * Math.Max(0f, DistanceToEnd));
-            desiredSpeed = Math.Min(desiredSpeed, brakingSpeed);
-        }
-
-        if (TargetNode != null && (TargetNode.IsBlocked || IsYielding) && DistanceToEnd < 15f)
-        {
-            float brakingSpeed = (float)Math.Sqrt(2f * 4f * Math.Max(0f, DistanceToEnd));
-            desiredSpeed = Math.Min(desiredSpeed, brakingSpeed);
-        }
+        desiredSpeed = ApplyBrakingConstraints(desiredSpeed);
 
         Speed = MoveTowards(Speed, desiredSpeed, acceleration * world.DeltaTime);
-    }
-
-    public override void Act(World world)
-    {
-        Move(world);
-    }
-
-    float MoveTowards(float current, float target, float maxDelta)
-    {
-        if (Math.Abs(target - current) <= maxDelta) return target;
-        return current + Math.Sign(target - current) * maxDelta;
     }
 }
