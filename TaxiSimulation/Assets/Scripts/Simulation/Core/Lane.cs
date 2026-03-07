@@ -28,33 +28,61 @@ public class Lane
     // Nearest vehicle ahead at a given position (for cross-lane perception)
     public VehicleAgent GetVehicleAheadAt(float position)
     {
-        for (int i = 0; i < Vehicles.Count; i++)
-            if (Vehicles[i].Position >= position)
-                return Vehicles[i];
-        return null;
+        int i = LowerBound(position);
+        return i < Vehicles.Count ? Vehicles[i] : null;
     }
 
     // Nearest vehicle behind at a given position (for cross-lane perception)
     public VehicleAgent GetVehicleBehindAt(float position)
     {
-        for (int i = Vehicles.Count - 1; i >= 0; i--)
-            if (Vehicles[i].Position <= position)
-                return Vehicles[i];
-        return null;
+        int i = UpperBound(position) - 1;
+        return i >= 0 ? Vehicles[i] : null;
     }
 
     // Physical segment overlap check — car occupies [pos, pos+length]
     // Two cars overlap if their segments intersect
     public bool IsSegmentFree(float position, float length)
     {
-        foreach (var v in Vehicles)
+        // All vehicles at index >= LowerBound(position + length) have Position >= position + length
+        // so they cannot overlap [position, position + length]. Scan backward from there.
+        int end = LowerBound(position + length);
+        for (int i = end - 1; i >= 0; i--)
         {
-            // Overlap if: myStart < theirEnd && theirStart < myEnd
-            if (position < v.Position + v.Length &&
-                v.Position < position + length)
-                return false;
+            var v = Vehicles[i];
+            if (v.Position + v.Length <= position) break; // sorted — earlier vehicles also can't overlap
+            return false;
         }
         return true;
+    }
+
+    // ---------------------------------------------------------------
+    // Binary search helpers (Vehicles sorted ascending by Position)
+    // ---------------------------------------------------------------
+
+    // First index where Vehicles[i].Position >= position
+    int LowerBound(float position)
+    {
+        int lo = 0, hi = Vehicles.Count;
+        while (lo < hi)
+        {
+            int mid = (lo + hi) / 2;
+            if (Vehicles[mid].Position < position) lo = mid + 1;
+            else hi = mid;
+        }
+        return lo;
+    }
+
+    // First index where Vehicles[i].Position > position
+    int UpperBound(float position)
+    {
+        int lo = 0, hi = Vehicles.Count;
+        while (lo < hi)
+        {
+            int mid = (lo + hi) / 2;
+            if (Vehicles[mid].Position <= position) lo = mid + 1;
+            else hi = mid;
+        }
+        return lo;
     }
 
     // ---------------------------------------------------------------
