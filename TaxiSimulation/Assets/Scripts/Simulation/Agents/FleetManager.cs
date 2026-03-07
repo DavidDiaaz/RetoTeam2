@@ -47,7 +47,7 @@ public class FleetManager : Agent
             p.State == PedestrianState.Matched);
 
         // Try to match each pending pedestrian
-        foreach (var p in pending.ToArray())
+        foreach (var p in new List<Pedestrian>(pending))
         {
             var taxi = FindNearestIdleTaxi(p.CurrentNode);
             if (taxi == null) continue;
