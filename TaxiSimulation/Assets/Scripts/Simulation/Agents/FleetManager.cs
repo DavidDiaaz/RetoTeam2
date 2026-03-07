@@ -63,43 +63,32 @@ public class FleetManager : Agent
     public override void Act(World world) { }
 
     // ---------------------------------------------------------------
-    // Find nearest idle taxi by BFS hop count from targetNode
+    // Find nearest idle taxi by actual road distance (Dijkstra)
     // ---------------------------------------------------------------
     AutonomousTaxi FindNearestIdleTaxi(TrafficNode targetNode)
     {
-        // BFS from targetNode outward — first idle taxi found wins
-        var visited = new HashSet<int>();
-        var queue   = new Queue<TrafficNode>();
+        AutonomousTaxi best     = null;
+        float          bestDist = float.MaxValue;
 
-        queue.Enqueue(targetNode);
-        visited.Add(targetNode.id);
-
-        while (queue.Count > 0)
+        foreach (var taxi in taxis)
         {
-            var node = queue.Dequeue();
+            if (!taxi.IsAvailable) continue;
 
-            // Check if any idle taxi is on an edge whose from == this node
-            foreach (var taxi in taxis)
-            {
-                if (!taxi.IsAvailable) continue;
-                if (taxi.CurrentNode == node) return taxi;
-            }
+            var path = Pathfinder.FindPath(graph, taxi.CurrentNode, targetNode);
+            if (path == null) continue;
 
-            // Expand — traverse edges in reverse (who points to this node?)
-            foreach (var n in graph.nodes.Values)
+            float dist = 0f;
+            foreach (var edge in path)
+                dist += edge.Length;
+
+            if (dist < bestDist)
             {
-                foreach (var edge in n.Outgoing)
-                {
-                    if (edge.to == node && !visited.Contains(n.id))
-                    {
-                        visited.Add(n.id);
-                        queue.Enqueue(n);
-                    }
-                }
+                bestDist = dist;
+                best     = taxi;
             }
         }
 
-        return null;
+        return best;
     }
 
     // ---------------------------------------------------------------
