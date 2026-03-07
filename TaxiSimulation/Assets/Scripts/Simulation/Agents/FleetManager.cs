@@ -5,7 +5,7 @@ public class FleetManager : Agent
 {
     NavigationGraph            graph;
     List<AutonomousTaxi>       taxis       = new();
-    List<Pedestrian>           pending     = new();
+    HashSet<Pedestrian>        pending     = new();
 
     public FleetManager(NavigationGraph graph)
     {
@@ -40,7 +40,7 @@ public class FleetManager : Agent
     public override void Deliberate(World world)
     {
         // Remove cancelled or done pedestrians
-        pending.RemoveAll(p =>
+        pending.RemoveWhere(p =>
             p.State == PedestrianState.Cancelled ||
             p.State == PedestrianState.Done       ||
             p.State == PedestrianState.Riding     ||

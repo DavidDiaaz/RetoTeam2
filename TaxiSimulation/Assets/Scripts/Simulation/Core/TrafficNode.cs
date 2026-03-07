@@ -15,7 +15,7 @@ public class TrafficNode
 
     // Vehicles stopped at their edge end wanting to enter this node
     // Populated during Perceive, cleared each tick before Perceive
-    public List<VehicleAgent> Contenders = new();
+    public HashSet<VehicleAgent> Contenders = new();
 
     public TrafficNode(int id)
     {
@@ -28,7 +28,6 @@ public class TrafficNode
 
     public void RegisterContender(VehicleAgent v)
     {
-        if (!Contenders.Contains(v))
-            Contenders.Add(v);
+        Contenders.Add(v); // HashSet.Add ignores duplicates
     }
 }
