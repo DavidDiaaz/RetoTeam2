@@ -98,8 +98,7 @@ public class NavGraphBuilder : MonoBehaviour
                 continue;
             }
 
-            var edge = graph.AddEdge(fromNode.id, toNode.id, 1, meters, lanePath.RoadClass);
-            edge.SpeedLimit = lanePath.SpeedLimit;
+            var edge = graph.AddEdge(fromNode.id, toNode.id, 1, meters, lanePath.RoadClass, lanePath.SpeedLimit);
 
             var laneView = new LaneView
             {

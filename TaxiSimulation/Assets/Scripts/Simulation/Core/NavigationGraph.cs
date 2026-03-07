@@ -14,17 +14,16 @@ public class NavigationGraph
         int       toId,
         int       laneCount,
         float     length,
-        RoadClass roadClass)
+        RoadClass roadClass,
+        int       speedLimit)
     {
         TrafficNode from = nodes[fromId];
         TrafficNode to   = nodes[toId];
 
-        int speed = roadClass == RoadClass.Primary ? 30 : 20;
-
         TrafficEdge edge = new TrafficEdge(from, to)
         {
-            Length    = length,
-            SpeedLimit = speed,
+            Length     = length,
+            SpeedLimit = speedLimit,
             RoadClass  = roadClass
         };
 
