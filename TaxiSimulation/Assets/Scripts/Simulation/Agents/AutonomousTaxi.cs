@@ -23,6 +23,14 @@ public class AutonomousTaxi : VehicleAgent
     {
         UpdatePerception(world);
 
+        // Passenger cancellation check
+        if (Passenger != null && Passenger.State == PedestrianState.Cancelled)
+        {
+            Passenger = null;
+            State     = TaxiState.Idle;
+            plannedPath.Clear();
+        }
+
         // Pickup check
         if (State == TaxiState.EnRoute && Passenger != null)
         {
