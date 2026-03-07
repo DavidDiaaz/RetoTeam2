@@ -53,7 +53,14 @@ public class FleetManager : Agent
             if (taxi == null) continue;
 
             var path = BuildFullPath(taxi.CurrentNode, p.CurrentNode, p.Destination);
-            if (path == null) continue;
+            if (path == null)
+            {
+                UnityEngine.Debug.LogWarning(
+                    $"[FleetManager] No path found for pedestrian at node {p.CurrentNode.id} " +
+                    $"→ destination {p.Destination.id}. Cancelling ride request.");
+                p.State = PedestrianState.Cancelled;
+                continue;
+            }
 
             taxi.AssignPath(path, p);
             p.OnMatched();
