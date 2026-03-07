@@ -86,7 +86,7 @@ public class AutonomousTaxi : VehicleAgent
     }
 
     public bool        IsAvailable => State == TaxiState.Idle;
-    public TrafficNode CurrentNode => CurrentLane?.Edge.from;
+    public TrafficNode CurrentNode => CurrentLane?.Edge.to;
 
     // ---------------------------------------------------------------
     public override void Deliberate(World world)
