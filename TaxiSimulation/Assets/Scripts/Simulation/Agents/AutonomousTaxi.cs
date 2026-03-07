@@ -31,24 +31,20 @@ public class AutonomousTaxi : VehicleAgent
             plannedPath.Clear();
         }
 
-        // Pickup check
+        // Pickup check — fires when taxi has just crossed the passenger's node (leg 2 starts here)
         if (State == TaxiState.EnRoute && Passenger != null)
         {
-            var from = CurrentLane.Edge.from;
-            var to   = CurrentLane.Edge.to;
-            if (from == Passenger.CurrentNode || to == Passenger.CurrentNode)
+            if (CurrentLane.Edge.from == Passenger.CurrentNode)
             {
                 Passenger.OnPickedUp();
                 State = TaxiState.Carrying;
             }
         }
 
-        // Dropoff check
+        // Dropoff check — fires when taxi is on the edge leading into the destination
         if (State == TaxiState.Carrying && Passenger != null)
         {
-            var from = CurrentLane.Edge.from;
-            var to   = CurrentLane.Edge.to;
-            if (from == Passenger.Destination || to == Passenger.Destination)
+            if (CurrentLane.Edge.to == Passenger.Destination)
             {
                 Passenger.OnDroppedOff();
                 world.FleetManager?.OnTaxiAvailable(this);
