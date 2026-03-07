@@ -3,9 +3,8 @@ using System.Collections.Generic;
 public class TrafficNode
 {
     public int               id;
-    public List<TrafficEdge> Outgoing   = new();
+    public List<TrafficEdge> Outgoing  = new();
     public TrafficLight      Light;
-
     // ---------------------------------------------------------------
     // Intersection state
     // ---------------------------------------------------------------
@@ -15,7 +14,8 @@ public class TrafficNode
 
     // Vehicles stopped at their edge end wanting to enter this node
     // Populated during Perceive, cleared each tick before Perceive
-    public HashSet<VehicleAgent> Contenders = new();
+
+    public List<VehicleAgent> Contenders = new();
 
     public TrafficNode(int id)
     {

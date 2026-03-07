@@ -15,16 +15,17 @@ public class NavigationGraph
         int       laneCount,
         float     length,
         RoadClass roadClass,
-        int       speedLimit)
+        int       entryLaneRequired = -1)
     {
         TrafficNode from = nodes[fromId];
         TrafficNode to   = nodes[toId];
 
-        TrafficEdge edge = new TrafficEdge(from, to)
+        var edge = new TrafficEdge(from, to)
         {
-            Length     = length,
-            SpeedLimit = speedLimit,
-            RoadClass  = roadClass
+            Length              = length,
+            SpeedLimit          = RoadClassInfo.SpeedLimit(roadClass),
+            RoadClass           = roadClass,
+            EntryLaneRequired   = entryLaneRequired
         };
 
         for (int i = 0; i < laneCount; i++)

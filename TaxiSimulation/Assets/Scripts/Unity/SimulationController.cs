@@ -1,10 +1,12 @@
 using UnityEngine;
+using System.Collections;
 using System.Collections.Generic;
 
 public class SimulationManager : MonoBehaviour
 {
-    [Header("Params")]
-    public float trafficDensity = 0.5f;
+    [Header("Spawning")]
+    [Tooltip("Seconds before a new car spawns after one exits.")]
+    public float respawnDelay = 2f;
 
     [Header("References")]
     public WorldView       worldView;
@@ -15,72 +17,67 @@ public class SimulationManager : MonoBehaviour
     void Start()
     {
         var graph = builder.Build(out var laneViews);
-        world     = new World(graph);
+        world = new World(graph);
 
         worldView.SetLaneViews(laneViews);
-        PopulateTraffic(world);
-        worldView.SpawnVehicles(world.Agents);
 
-        Debug.Log($"[Simulation] Ready — {world.Agents.Count} agents, {graph.nodes.Count} nodes");
+        foreach (var (road, edge) in builder.RoadEdges)
+            for (int i = 0; i < edge.Lanes.Count; i++)
+                SpawnCar(edge.Lanes[i]);
+
+        Debug.Log($"[Simulation] Ready — {world.Agents.Count} agents");
     }
 
     void Update()
     {
         world.Tick(Time.deltaTime);
         builder.PollLightEvents(world.Navigation);
+        CheckForExits();
     }
 
-    void PopulateTraffic(World world)
+    void CheckForExits()
     {
-        foreach (var node in world.Navigation.nodes.Values)
-            foreach (var edge in node.Outgoing)
-                for (int i = 0; i < edge.Lanes.Count; i++)
-                    PopulateLane(world, edge.Lanes[i]);
+        for (int i = world.Agents.Count - 1; i >= 0; i--)
+        {
+            if (!(world.Agents[i] is VehicleAgent v)) continue;
+
+            // Only despawn at true dead ends — road segment edges with no outgoing connections
+            // Never despawn on connection edges even if their end node looks terminal
+            bool atDeadEnd = v.TargetNode != null &&
+                             v.TargetNode.Outgoing.Count == 0 &&
+                             !v.CurrentLane.Edge.IsConnection &&
+                             v.DistanceToEdgeEnd <= 0.1f;
+
+            if (!atDeadEnd) continue;
+
+            Lane lane = v.CurrentLane;
+
+            world.Agents.RemoveAt(i);
+            lane.Remove(v);
+            worldView.DestroyVehicle(v);
+
+            StartCoroutine(RespawnAfterDelay(lane));
+        }
     }
 
-    void PopulateLane(World world, Lane lane)
+    IEnumerator RespawnAfterDelay(Lane lane)
     {
-        float laneLength = lane.Edge.Length;
-        float minGap     = lane.Edge.Length / 10f; // minimum separation
-        int   count      = Mathf.FloorToInt(10 * trafficDensity);
+        yield return new WaitForSeconds(respawnDelay);
+        SpawnCar(lane);
+    }
 
-        int laneNumber = worldView.GetLaneView(lane)?.LaneNumber ?? 0;
+    void SpawnCar(Lane lane)
+    {
+        if (!lane.IsSegmentFree(0f, 4.5f)) return;
 
-        // Generate random non-overlapping positions
-        var positions = new List<float>();
+        var car = new AmbientDriver();
+        car.CurrentLane = lane;
+        car.LaneNumber  = lane.LaneNumber;
+        car.Position    = 0f;
+        car.Speed       = 0f;
 
-        int attempts = 0;
-        while (positions.Count < count && attempts < count * 10)
-        {
-            attempts++;
-            float candidate = UnityEngine.Random.Range(0f, laneLength);
-
-            bool tooClose = false;
-            foreach (float p in positions)
-            {
-                if (Mathf.Abs(p - candidate) < minGap)
-                {
-                    tooClose = true;
-                    break;
-                }
-            }
-
-            if (!tooClose) positions.Add(candidate);
-        }
-
-        // Sort so LaneIndex order matches Position order
-        positions.Sort();
-
-        for (int i = 0; i < positions.Count; i++)
-        {
-            AmbientDriver car = new AmbientDriver();
-            car.CurrentLane = lane;
-            car.LaneNumber  = laneNumber;
-            car.Position    = positions[i];
-            car.LaneIndex   = lane.Vehicles.Count;
-
-            lane.Vehicles.Add(car);
-            world.Agents.Add(car);
-        }
+        lane.InsertSorted(car);
+        world.Agents.Add(car);
+        worldView.SpawnVehicle(car);
     }
 }
