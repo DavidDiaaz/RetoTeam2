@@ -12,6 +12,20 @@ public class VehicleView : MonoBehaviour
     float   laneChangeTimer   = 0f;
     const float LaneChangeDuration = 0.3f;
 
+    void Start()
+    {
+        if (Agent == null || WorldView == null) return;
+
+        var laneView = WorldView.GetLaneView(Agent.CurrentLane);
+        if (laneView == null) return;
+
+        float edgeLength = Agent.CurrentLane.Edge.Length;
+        transform.position = laneView.Evaluate(Agent.Position, edgeLength);
+
+        lastLane = Agent.CurrentLane;
+        lastEdge = Agent.CurrentLane.Edge;
+    }
+
     void Update()
     {
         if (Agent == null || WorldView == null) return;
