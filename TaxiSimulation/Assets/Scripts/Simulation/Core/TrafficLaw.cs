@@ -53,27 +53,48 @@ public static class TrafficLaw
     // Roundabout
     // ---------------------------------------------------------------
 
+    /// <summary>
+    /// Returns true if 'me' must yield before entering a roundabout.
+    /// Checks one and two hops ahead to handle both direct (connection
+    /// classified as Roundabout) and indirect (Local connection → roundabout arc).
+    /// </summary>
     public static bool MustYieldToRoundabout(VehicleAgent me)
     {
+        // Already circulating — no need to yield
         if (me.CurrentLane.Edge.RoadClass == RoadClass.Roundabout)
             return false;
-        return me.TargetEdge?.RoadClass == RoadClass.Roundabout;
-    }
 
-    public static bool IsRoundaboutOccupied(VehicleAgent me)
-    {
-        if (me.TargetNode == null) return false;
+        // Direct: next edge is already a roundabout arc
+        if (me.TargetEdge?.RoadClass == RoadClass.Roundabout)
+            return true;
 
-        foreach (var contender in me.TargetNode.Contenders)
+        // Indirect: next edge is a connection whose destination leads into a roundabout arc
+        if (me.TargetEdge != null)
         {
-            if (contender == me) continue;
-            if (contender.CurrentLane.Edge.RoadClass == RoadClass.Roundabout)
-                return true;
+            foreach (var outgoing in me.TargetEdge.to.Outgoing)
+            {
+                if (outgoing.RoadClass == RoadClass.Roundabout)
+                    return true;
+            }
         }
 
-        var occupant = me.TargetNode.OccupiedBy;
-        return occupant != null && occupant != me &&
-               occupant.CurrentLane.Edge.RoadClass == RoadClass.Roundabout;
+        return false;
+    }
+
+    /// <summary>
+    /// Returns true if any vehicle is currently circulating on a Roundabout-class edge.
+    /// Must use the global agent list because circulating vehicles are at internal
+    /// roundabout nodes, not at the approaching vehicle's TargetNode.
+    /// </summary>
+    public static bool IsRoundaboutOccupied(VehicleAgent me, System.Collections.Generic.IEnumerable<Agent> agents)
+    {
+        foreach (var agent in agents)
+        {
+            if (!(agent is VehicleAgent v) || v == me) continue;
+            if (v.CurrentLane?.Edge.RoadClass == RoadClass.Roundabout)
+                return true;
+        }
+        return false;
     }
 
     // ---------------------------------------------------------------

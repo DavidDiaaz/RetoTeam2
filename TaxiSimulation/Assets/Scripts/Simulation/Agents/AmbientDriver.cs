@@ -158,7 +158,7 @@ public class AmbientDriver : VehicleAgent
 
         if (profile.LawAbidance > 0.3f &&
             TrafficLaw.MustYieldToRoundabout(this) &&
-            TrafficLaw.IsRoundaboutOccupied(this))
+            TrafficLaw.IsRoundaboutOccupied(this, world.Agents))
         {
             desiredSpeed = Math.Min(desiredSpeed, ComputeBrakingSpeed(DistanceToEnd));
         }
