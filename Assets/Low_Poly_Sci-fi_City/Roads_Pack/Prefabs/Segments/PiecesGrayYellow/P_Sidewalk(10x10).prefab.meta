@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 009e0410fc93bb24d891c089ea5703a6
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 242670
+  packageName: Sci-Fi Cyberpunk City Environment with Road System and Skyscrapers
+    - Cityscape
+  packageVersion: 1.0.0
+  assetPath: Assets/Low_Poly_Sci-fi_City/Roads_Pack/Prefabs/Segments/PiecesGrayYellow/P_Sidewalk(10x10).prefab
+  uploadId: 680759

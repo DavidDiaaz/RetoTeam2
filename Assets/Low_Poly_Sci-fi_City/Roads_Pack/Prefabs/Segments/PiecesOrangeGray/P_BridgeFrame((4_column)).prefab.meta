@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 1c331c81596312d45a4b91f58ed5be9f
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 242670
+  packageName: Sci-Fi Cyberpunk City Environment with Road System and Skyscrapers
+    - Cityscape
+  packageVersion: 1.0.0
+  assetPath: Assets/Low_Poly_Sci-fi_City/Roads_Pack/Prefabs/Segments/PiecesOrangeGray/P_BridgeFrame((4_column)).prefab
+  uploadId: 680759

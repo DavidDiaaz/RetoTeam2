@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 6fd54ee0a29077b48b218c364f29c646
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 242670
+  packageName: Sci-Fi Cyberpunk City Environment with Road System and Skyscrapers
+    - Cityscape
+  packageVersion: 1.0.0
+  assetPath: Assets/Low_Poly_Sci-fi_City/Roads_Pack/Textures_Materials_Models/Materials/StreetLightsYellow_GrayRed.mat
+  uploadId: 680759

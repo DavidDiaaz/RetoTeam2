@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: a3e03fbfa739fa74d87b8c5978e280ff
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 242670
+  packageName: Sci-Fi Cyberpunk City Environment with Road System and Skyscrapers
+    - Cityscape
+  packageVersion: 1.0.0
+  assetPath: Assets/Low_Poly_Sci-fi_City/Buildings_Pack/Prefabs/Buildings/MitikoWhiteBuilding.prefab
+  uploadId: 680759

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: d5e6a09a055dd764ebb6ee0de0e4af52
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 242670
+  packageName: Sci-Fi Cyberpunk City Environment with Road System and Skyscrapers
+    - Cityscape
+  packageVersion: 1.0.0
+  assetPath: Assets/Low_Poly_Sci-fi_City/Buildings_Pack/Prefabs/Pieces/OctagonStandGray.prefab
+  uploadId: 680759
