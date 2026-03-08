@@ -288,9 +288,10 @@ public abstract class VehicleAgent : Agent
         IsYielding            = false;
         WaitTime              = 0f;
 
+        float overflow = Position - CurrentLane.Edge.Length;
         CurrentLane.Remove(this);
         CurrentLane          = nextLane;
-        Position             = 0f;
+        Position             = Math.Max(0f, overflow);
         LaneNumber           = clampedLane;
         TargetEdge           = null;
         TargetLaneNumber     = 0;
