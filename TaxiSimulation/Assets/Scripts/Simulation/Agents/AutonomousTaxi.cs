@@ -72,9 +72,18 @@ public class AutonomousTaxi : VehicleAgent
             State     = TaxiState.Idle;
         }
 
-        // Idle — roam randomly
+        // Idle — roam randomly, but only via lanes reachable from the current lane
         if (node.Outgoing.Count == 0) return null;
-        return node.Outgoing[rng.Next(node.Outgoing.Count)];
+
+        var reachable = new System.Collections.Generic.List<TrafficEdge>();
+        foreach (var edge in node.Outgoing)
+        {
+            if (edge.EntryLaneRequired < 0 || edge.EntryLaneRequired == LaneNumber)
+                reachable.Add(edge);
+        }
+
+        var candidates = reachable.Count > 0 ? reachable : node.Outgoing;
+        return candidates[rng.Next(candidates.Count)];
     }
 
     // ---------------------------------------------------------------
@@ -91,6 +100,10 @@ public class AutonomousTaxi : VehicleAgent
     // ---------------------------------------------------------------
     public override void Deliberate(World world)
     {
+        // Force lane change when a required entry lane doesn't match the current one
+        if (NeedsEntryLaneChange && !CurrentLane.Edge.IsConnection)
+            TryChangeLane(RequiredLane, 4f);
+
         ChooseSpeed(world);
     }
 
@@ -102,6 +115,12 @@ public class AutonomousTaxi : VehicleAgent
         {
             float followFactor = Math.Max(0f, GapAhead / 8f);
             desiredSpeed = Math.Min(desiredSpeed, AheadOnLane.Speed * followFactor);
+        }
+
+        if (TrafficLaw.MustYieldToRoundabout(this) &&
+            TrafficLaw.IsRoundaboutOccupied(this, world.Agents))
+        {
+            desiredSpeed = Math.Min(desiredSpeed, ComputeBrakingSpeed(DistanceToEnd));
         }
 
         desiredSpeed = ApplyBrakingConstraints(desiredSpeed);
