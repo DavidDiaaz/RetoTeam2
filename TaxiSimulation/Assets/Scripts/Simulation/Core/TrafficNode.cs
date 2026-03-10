@@ -2,25 +2,16 @@ using System.Collections.Generic;
 
 public class TrafficNode
 {
-    public int               id;
+    public int    id;
+    public string Label = ""; // set by NavGraphBuilder, e.g. "Road_seg0 END"
+
     public List<TrafficEdge> Outgoing  = new();
     public TrafficLight      Light;
-    // ---------------------------------------------------------------
-    // Intersection state
-    // ---------------------------------------------------------------
 
-    // Vehicle physically inside the intersection right now
-    public VehicleAgent OccupiedBy = null;
-
-    // Vehicles stopped at their edge end wanting to enter this node
-    // Populated during Perceive, cleared each tick before Perceive
-
+    public VehicleAgent       OccupiedBy = null;
     public List<VehicleAgent> Contenders = new();
 
-    public TrafficNode(int id)
-    {
-        this.id = id;
-    }
+    public TrafficNode(int id) { this.id = id; }
 
     public bool IsBlocked => OccupiedBy != null;
 
@@ -28,6 +19,7 @@ public class TrafficNode
 
     public void RegisterContender(VehicleAgent v)
     {
-        Contenders.Add(v); // HashSet.Add ignores duplicates
+        if (!Contenders.Contains(v))
+            Contenders.Add(v);
     }
 }

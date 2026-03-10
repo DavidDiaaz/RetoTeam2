@@ -5,7 +5,6 @@ using System.Collections.Generic;
 public class SimulationManager : MonoBehaviour
 {
     [Header("Spawning")]
-    [Tooltip("Seconds before a new car spawns after one exits.")]
     public float respawnDelay = 2f;
 
     [Header("References")]
@@ -21,7 +20,8 @@ public class SimulationManager : MonoBehaviour
 
         worldView.SetLaneViews(laneViews);
 
-        foreach (var (road, edge) in builder.RoadEdges)
+        // Spawn one car per lane on every road segment
+        foreach (var (seg, edge) in builder.RoadEdges)
             for (int i = 0; i < edge.Lanes.Count; i++)
                 SpawnCar(edge.Lanes[i]);
 
@@ -41,8 +41,6 @@ public class SimulationManager : MonoBehaviour
         {
             if (!(world.Agents[i] is VehicleAgent v)) continue;
 
-            // Only despawn at true dead ends — road segment edges with no outgoing connections
-            // Never despawn on connection edges even if their end node looks terminal
             bool atDeadEnd = v.TargetNode != null &&
                              v.TargetNode.Outgoing.Count == 0 &&
                              !v.CurrentLane.Edge.IsConnection &&
@@ -51,11 +49,9 @@ public class SimulationManager : MonoBehaviour
             if (!atDeadEnd) continue;
 
             Lane lane = v.CurrentLane;
-
             world.Agents.RemoveAt(i);
             lane.Remove(v);
             worldView.DestroyVehicle(v);
-
             StartCoroutine(RespawnAfterDelay(lane));
         }
     }

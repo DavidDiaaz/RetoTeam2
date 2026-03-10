@@ -12,7 +12,7 @@ public class NavGraphBuilder : MonoBehaviour
 
     readonly Dictionary<TrafficNode, TrafficLight.State> prevLightStates = new();
 
-    public List<(RoadSegment road, TrafficEdge edge)> RoadEdges { get; private set; } = new();
+    public List<(RoadSegment seg, TrafficEdge edge)> RoadEdges { get; private set; } = new();
 
     Dictionary<RoadSegment, TrafficNode> startNodes = new();
     Dictionary<RoadSegment, TrafficNode> endNodes   = new();
@@ -24,71 +24,85 @@ public class NavGraphBuilder : MonoBehaviour
         startNodes = new Dictionary<RoadSegment, TrafficNode>();
         endNodes   = new Dictionary<RoadSegment, TrafficNode>();
 
-        var graph    = new NavigationGraph();
-        var segments = FindObjectsByType<RoadSegment>(FindObjectsSortMode.None);
-
+        var graph = new NavigationGraph();
         int nextId = 0;
 
-        // ---- Pass 1: road segments ----
-        foreach (var road in segments)
+        // Collect all segments from all Road objects
+        var roads    = FindObjectsByType<Road>(FindObjectsSortMode.None);
+        var segments = new List<RoadSegment>();
+
+        foreach (var road in roads)
+            foreach (var seg in road.Segments)
+                if (seg != null) segments.Add(seg);
+
+        // Fallback — if no Roads with segments, try standalone RoadSegments
+        if (segments.Count == 0)
+        {
+            var standalone = FindObjectsByType<RoadSegment>(FindObjectsSortMode.None);
+            segments.AddRange(standalone);
+            if (standalone.Length > 0)
+                Debug.LogWarning("[NavGraphBuilder] No Road objects with segments found. Using standalone RoadSegments.");
+        }
+
+        // ---- Pass 1: segments → edges ----
+        foreach (var seg in segments)
         {
             var fromNode = new TrafficNode(nextId++);
             var toNode   = new TrafficNode(nextId++);
 
+            // Human-readable labels for debugging
+            fromNode.Label = $"{seg.name} START";
+            toNode.Label   = $"{seg.name} END";
+
             graph.AddNode(fromNode);
             graph.AddNode(toNode);
 
-            startNodes[road] = fromNode;
-            endNodes[road]   = toNode;
+            startNodes[seg] = fromNode;
+            endNodes[seg]   = toNode;
 
-            if (road.HasTrafficLight)
+            if (seg.HasTrafficLight)
             {
                 toNode.Light = new TrafficLight
                 {
-                    CurrentState   = road.InitialState,
-                    GreenDuration  = road.GreenDuration,
-                    YellowDuration = road.YellowDuration,
-                    RedDuration    = road.RedDuration
+                    CurrentState   = seg.InitialState,
+                    GreenDuration  = seg.GreenDuration,
+                    YellowDuration = seg.YellowDuration,
+                    RedDuration    = seg.RedDuration
                 };
-                prevLightStates[toNode] = road.InitialState;
+                prevLightStates[toNode] = seg.InitialState;
             }
 
-            float meters = road.WorldLength * metersPerUnit;
+            float meters = seg.WorldLength * metersPerUnit;
 
             if (meters < 6f)
             {
-                Debug.LogWarning(
-                    $"[NavGraphBuilder] '{road.name}' is {meters:F1}m — too short, skipped.");
+                Debug.LogWarning($"[NavGraphBuilder] '{seg.name}' is {meters:F1}m — too short, skipped.");
                 continue;
             }
 
             var edge = graph.AddEdge(
                 fromNode.id, toNode.id,
-                road.LaneCount,
+                seg.LaneCount,
                 meters,
-                road.RoadClass);
+                seg.RoadClass);
 
-            for (int i = 0; i < road.LaneCount; i++)
+            for (int i = 0; i < seg.LaneCount; i++)
             {
                 var laneView = new LaneView
                 {
                     Lane      = edge.Lanes[i],
-                    Waypoints = new Vector3[]
-                    {
-                        road.LaneStartPosition(i),
-                        road.LaneEndPosition(i)
-                    },
+                    Waypoints = new Vector3[] { seg.LaneStartPosition(i), seg.LaneEndPosition(i) },
                     LaneNumber = i
                 };
                 laneView.Build();
                 laneViews[edge.Lanes[i]] = laneView;
             }
 
-            RoadEdges.Add((road, edge));
+            RoadEdges.Add((seg, edge));
 
             Debug.Log(
-                $"[NavGraphBuilder] '{road.name}' {fromNode.id}→{toNode.id} " +
-                $"{meters:F1}m {road.LaneCount} lanes {road.RoadClass} {road.SpeedLimit}km/h");
+                $"[NavGraphBuilder] '{seg.name}' [{fromNode.id}→{toNode.id}] " +
+                $"{meters:F1}m {seg.LaneCount} lanes {seg.RoadClass} {seg.SpeedLimit}km/h");
         }
 
         // ---- Pass 2: connections ----
@@ -105,8 +119,7 @@ public class NavGraphBuilder : MonoBehaviour
             if (!endNodes.TryGetValue(conn.SourceRoad, out var fromNode) ||
                 !startNodes.TryGetValue(conn.TargetRoad, out var toNode))
             {
-                Debug.LogWarning(
-                    $"[NavGraphBuilder] '{conn.name}' references unknown road — skipped.");
+                Debug.LogWarning($"[NavGraphBuilder] '{conn.name}' references unknown segment — skipped.");
                 continue;
             }
 
@@ -115,21 +128,17 @@ public class NavGraphBuilder : MonoBehaviour
 
             var edge = graph.AddEdge(
                 fromNode.id, toNode.id,
-                laneCount:          1,
-                length:             meters,
-                roadClass:          conn.RoadClass,
-                entryLaneRequired:  conn.TargetLane);
+                laneCount:         1,
+                length:            meters,
+                roadClass:         conn.RoadClass,
+                entryLaneRequired: conn.TargetLane);
 
-            edge.IsConnection = true; // prevents SimulationManager from despawning mid-arc
+            edge.IsConnection = true;
 
             var laneView = new LaneView
             {
                 Lane      = edge.Lanes[0],
-                Waypoints = new Vector3[]
-                {
-                    conn.StartPoint,
-                    conn.EndPoint
-                },
+                Waypoints = new Vector3[] { conn.StartPoint, conn.EndPoint },
                 LaneNumber = 0
             };
             laneView.Build();
