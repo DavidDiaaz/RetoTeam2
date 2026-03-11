@@ -8,11 +8,12 @@ public class SimulationManager : MonoBehaviour
     // ---------------------------------------------------------------
 
     [Header("References")]
-    public WorldView       worldView;
-    public NavGraphBuilder builder;
+    public WorldView              worldView;
+    public NavGraphBuilder        builder;
+    public CameraFollowController followCam;   // optional — assign to enable follow cam
 
     [Header("Ambient traffic")]
-    [Tooltip("How many ambient cars to place per Road (spread across its segments/lanes)")]
+    [Tooltip("Ambient cars placed per Road, spread across its lanes")]
     public int carsPerRoad = 4;
 
     [Header("Taxis")]
@@ -23,7 +24,7 @@ public class SimulationManager : MonoBehaviour
     public int   maxPedestrians      = 10;
     [Tooltip("Seconds between automatic new pedestrian spawns")]
     public float pedestrianSpawnRate = 15f;
-    [Tooltip("Seconds a pedestrian will wait before cancelling")]
+    [Tooltip("Seconds a pedestrian waits before cancelling")]
     public float pedestrianTolerance = 120f;
 
     // ---------------------------------------------------------------
@@ -35,14 +36,14 @@ public class SimulationManager : MonoBehaviour
     List<Lane>        _spawnableLanes = new();
     List<TrafficNode> _roadNodes      = new();
 
-    // Segment → edge reverse lookup, built once on Start
     Dictionary<TrafficEdge, RoadSegment> _edgeToSegment = new();
 
     float _pedestrianSpawnTimer = 0f;
     int   _activePedestrians    = 0;
-
-    // Pedestrians we own so we can clean up their views
     readonly HashSet<Pedestrian> _trackedPedestrians = new();
+
+    // Maps VehicleAgent → instantiated GO (so we can tell the follow cam)
+    readonly Dictionary<VehicleAgent, GameObject> _vehicleGOs = new();
 
     // ---------------------------------------------------------------
     void Start()
@@ -53,11 +54,9 @@ public class SimulationManager : MonoBehaviour
         builder.RegisterGroupsWithWorld(world);
         worldView.SetLaneViews(laneViews);
 
-        // Build helper lookups
         foreach (var (seg, edge) in builder.RoadEdges)
         {
             _edgeToSegment[edge] = seg;
-
             if (edge.IsConnector) continue;
 
             foreach (var lane in edge.Lanes)
@@ -65,7 +64,7 @@ public class SimulationManager : MonoBehaviour
 
             if (edge.from != null && !_roadNodes.Contains(edge.from))
                 _roadNodes.Add(edge.from);
-            if (edge.to   != null && !_roadNodes.Contains(edge.to))
+            if (edge.to != null && !_roadNodes.Contains(edge.to))
                 _roadNodes.Add(edge.to);
         }
 
@@ -76,8 +75,7 @@ public class SimulationManager : MonoBehaviour
             TrySpawnPedestrian();
 
         Debug.Log($"[Simulation] Ready — {world.Agents.Count} agents, " +
-                  $"{_spawnableLanes.Count} spawnable lanes, " +
-                  $"{_roadNodes.Count} road nodes.");
+                  $"{_spawnableLanes.Count} lanes, {_roadNodes.Count} nodes.");
     }
 
     // ---------------------------------------------------------------
@@ -98,13 +96,11 @@ public class SimulationManager : MonoBehaviour
     }
 
     // ---------------------------------------------------------------
-    // Ambient traffic — carsPerRoad, evenly spread across all lanes in that road
+    // Ambient traffic
     // ---------------------------------------------------------------
     void SpawnAmbientTraffic()
     {
-        // Group lanes by their owning Road
         var byRoad = new Dictionary<Road, List<Lane>>();
-
         foreach (var lane in _spawnableLanes)
         {
             var seg  = FindSegmentForEdge(lane.Edge);
@@ -119,19 +115,15 @@ public class SimulationManager : MonoBehaviour
         foreach (var (_, lanes) in byRoad)
         {
             int count = Mathf.Min(carsPerRoad, lanes.Count);
-
             for (int i = 0; i < count; i++)
             {
-                // Spread evenly by index across available lanes
                 float t    = count == 1 ? 0.5f : i / (float)(count - 1);
                 int   idx  = Mathf.RoundToInt(t * (lanes.Count - 1));
                 Lane  lane = lanes[idx];
 
-                // Space cars along the lane so they don't all pile at t=0
                 float pos = Mathf.Clamp(
                     lane.Edge.Length * (0.1f + 0.8f * i / Mathf.Max(count - 1, 1)),
-                    0f,
-                    lane.Edge.Length - 5f);
+                    0f, lane.Edge.Length - 5f);
 
                 SpawnAmbientCar(lane, pos);
             }
@@ -153,17 +145,22 @@ public class SimulationManager : MonoBehaviour
 
         lane.InsertSorted(car);
         world.Agents.Add(car);
-        worldView.SpawnVehicle(car);
+
+        var go = worldView.SpawnVehicleAndReturn(car);
+        if (go != null)
+        {
+            _vehicleGOs[car] = go;
+            followCam?.RegisterVehicle(car, go);
+        }
     }
 
     // ---------------------------------------------------------------
-    // Taxis — placed on random lanes at startup
+    // Taxis
     // ---------------------------------------------------------------
     void SpawnTaxis()
     {
         if (_spawnableLanes.Count == 0) return;
 
-        // Shuffle a copy so we don't bias toward the same lanes every run
         var shuffled = new List<Lane>(_spawnableLanes);
         for (int i = shuffled.Count - 1; i > 0; i--)
         {
@@ -187,7 +184,13 @@ public class SimulationManager : MonoBehaviour
 
             lane.InsertSorted(taxi);
             world.AddTaxi(taxi);
-            worldView.SpawnVehicle(taxi);
+
+            var go = worldView.SpawnVehicleAndReturn(taxi);
+            if (go != null)
+            {
+                _vehicleGOs[taxi] = go;
+                followCam?.RegisterVehicle(taxi, go);
+            }
             spawned++;
         }
 
@@ -195,7 +198,7 @@ public class SimulationManager : MonoBehaviour
     }
 
     // ---------------------------------------------------------------
-    // Pedestrians — random origin/destination from real road nodes
+    // Pedestrians
     // ---------------------------------------------------------------
     void TrySpawnPedestrian()
     {
@@ -209,27 +212,19 @@ public class SimulationManager : MonoBehaviour
         TrafficNode origin = _roadNodes[originIdx];
         TrafficNode dest   = _roadNodes[destIdx];
 
-        // Stand just off the road edge at the origin node
-        Vector3 worldPos   = GetNodeWorldPosition(origin);
-        worldPos           += new Vector3(Random.Range(-0.5f, 0.5f), 0.1f, Random.Range(-0.5f, 0.5f));
+        Vector3 worldPos = GetNodeWorldPosition(origin)
+            + new Vector3(Random.Range(-0.5f, 0.5f), 0.1f, Random.Range(-0.5f, 0.5f));
 
         var p = new Pedestrian(origin, dest, pedestrianTolerance, worldPos);
-
         world.AddPedestrian(p);
         worldView.SpawnPedestrian(p);
-
         _trackedPedestrians.Add(p);
         _activePedestrians++;
     }
 
-    // ---------------------------------------------------------------
-    // Remove views for Done / Cancelled pedestrians
-    // (World.Tick already prunes them from world.Agents)
-    // ---------------------------------------------------------------
     void CleanUpPedestrians()
     {
         var toRemove = new List<Pedestrian>();
-
         foreach (var p in _trackedPedestrians)
         {
             if (p.State == PedestrianState.Done ||
@@ -257,11 +252,10 @@ public class SimulationManager : MonoBehaviour
 
     Vector3 GetNodeWorldPosition(TrafficNode node)
     {
-        // Find a real-road lane whose edge starts or ends at this node
         foreach (var (seg, edge) in builder.RoadEdges)
         {
             if (edge.IsConnector) continue;
-            if (edge.to == node)   return seg.LaneEndPosition(0);
+            if (edge.to   == node) return seg.LaneEndPosition(0);
             if (edge.from == node) return seg.LaneStartPosition(0);
         }
         return Vector3.zero;

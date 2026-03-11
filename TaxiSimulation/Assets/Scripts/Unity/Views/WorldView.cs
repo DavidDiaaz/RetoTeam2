@@ -26,15 +26,17 @@ public class WorldView : MonoBehaviour
     // Vehicles
     // ---------------------------------------------------------------
 
-    public void SpawnVehicle(VehicleAgent vehicle)
+    /// <summary>Spawn a vehicle and return its GO (used by SimulationManager
+    /// to register it with CameraFollowController).</summary>
+    public GameObject SpawnVehicleAndReturn(VehicleAgent vehicle)
     {
-        if (_vehicleGOs.ContainsKey(vehicle)) return;
+        if (_vehicleGOs.TryGetValue(vehicle, out var existing)) return existing;
 
         var prefab = vehicle is AutonomousTaxi ? taxiPrefab : ambientCarPrefab;
         if (prefab == null)
         {
             Debug.LogWarning($"[WorldView] No prefab assigned for {vehicle.GetType().Name}");
-            return;
+            return null;
         }
 
         var go        = Instantiate(prefab, transform);
@@ -43,7 +45,11 @@ public class WorldView : MonoBehaviour
         view.WorldView = this;
 
         _vehicleGOs[vehicle] = go;
+        return go;
     }
+
+    /// <summary>Convenience wrapper — same as SpawnVehicleAndReturn but discards the return value.</summary>
+    public void SpawnVehicle(VehicleAgent vehicle) => SpawnVehicleAndReturn(vehicle);
 
     public void DestroyVehicle(VehicleAgent vehicle)
     {
