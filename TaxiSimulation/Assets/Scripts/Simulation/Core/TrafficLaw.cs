@@ -1,21 +1,16 @@
-using System.Collections.Generic;
-
 /// <summary>
-/// Static traffic law rules. Returns what the law says should happen.
-/// Agents may choose to follow or ignore based on Profile.LawAbidance.
-/// No spatial math — direction is encoded by lane number convention:
-///   0 = leftmost, highest = rightmost.
+/// Static traffic law rules.
+/// No spatial math — road class hierarchy and lane number encode priority.
 /// </summary>
 public static class TrafficLaw
 {
     // ---------------------------------------------------------------
-    // Right of way
+    // Right of way — used at merge points
     // ---------------------------------------------------------------
 
     /// <summary>
     /// Does 'me' have legal right of way over 'other'?
-    /// Road class hierarchy first, then right-hand rule via lane number.
-    /// Lower lane number = left = has priority over right.
+    /// Road class hierarchy first, then lower lane number wins (left over right).
     /// </summary>
     public static bool HasRightOfWay(VehicleAgent me, VehicleAgent other)
     {
@@ -25,76 +20,19 @@ public static class TrafficLaw
         if (myWeight != theirWeight)
             return myWeight > theirWeight;
 
-        // Same road class — lower lane number has priority (left over right)
         return me.LaneNumber < other.LaneNumber;
-    }
-
-    /// <summary>
-    /// Returns -1 to +1 score based on legal right of way over all contenders.
-    /// </summary>
-    public static float RightOfWayScore(VehicleAgent me, List<VehicleAgent> contenders)
-    {
-        if (contenders == null || contenders.Count == 0) return 0f;
-
-        int wins = 0, losses = 0;
-
-        foreach (var other in contenders)
-        {
-            if (other == me) continue;
-            if (HasRightOfWay(me, other)) wins++;
-            else losses++;
-        }
-
-        int total = wins + losses;
-        return total == 0 ? 0f : (wins - losses) / (float)total;
     }
 
     // ---------------------------------------------------------------
     // Roundabout
     // ---------------------------------------------------------------
 
-    /// <summary>
-    /// Returns true if 'me' must yield before entering a roundabout.
-    /// Checks one and two hops ahead to handle both direct (connection
-    /// classified as Roundabout) and indirect (Local connection → roundabout arc).
-    /// </summary>
+    /// <summary>Must yield before entering a roundabout if not already inside.</summary>
     public static bool MustYieldToRoundabout(VehicleAgent me)
     {
-        // Already circulating — no need to yield
         if (me.CurrentLane.Edge.RoadClass == RoadClass.Roundabout)
             return false;
-
-        // Direct: next edge is already a roundabout arc
-        if (me.TargetEdge?.RoadClass == RoadClass.Roundabout)
-            return true;
-
-        // Indirect: next edge is a connection whose destination leads into a roundabout arc
-        if (me.TargetEdge != null)
-        {
-            foreach (var outgoing in me.TargetEdge.to.Outgoing)
-            {
-                if (outgoing.RoadClass == RoadClass.Roundabout)
-                    return true;
-            }
-        }
-
-        return false;
-    }
-
-    /// <summary>
-    /// Returns true if any vehicle is currently circulating on a Roundabout-class edge.
-    /// Must use the global agent list because circulating vehicles are at internal
-    /// roundabout nodes, not at the approaching vehicle's TargetNode.
-    /// </summary>
-    public static bool IsRoundaboutOccupied(VehicleAgent me, System.Collections.Generic.IEnumerable<Agent> agents)
-    {
-        foreach (var agent in agents)
-        {
-            if (!(agent is VehicleAgent v) || v == me) continue;
-            if (v.CurrentLane?.Edge.RoadClass == RoadClass.Roundabout)
-                return true;
-        }
-        return false;
+        return me.TargetEdge?.RoadClass == RoadClass.Roundabout;
     }
 
     // ---------------------------------------------------------------
@@ -103,6 +41,12 @@ public static class TrafficLaw
 
     public static float SpeedLimitMs(VehicleAgent me)
         => me.CurrentLane.Edge.SpeedLimit * (1000f / 3600f);
+
+    /// <summary>
+    /// Roundabout occupancy — returns false until roundabout merge logic is implemented
+    /// via LaneLink presence model.
+    /// </summary>
+    public static bool IsRoundaboutOccupied(VehicleAgent me) => false;
 
     public static bool IsSpeeding(VehicleAgent me)
         => me.Speed > SpeedLimitMs(me) * 1.05f;

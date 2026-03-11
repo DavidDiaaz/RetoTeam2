@@ -1,60 +1,59 @@
 using System;
 using System.Collections.Generic;
 
+/// <summary>
+/// Ambient background traffic driver.
+///
+/// Car-following uses a simplified IDM (Intelligent Driver Model):
+///   desired acceleration = a * [1 - (v/v0)^4 - (s*/s)^2]
+/// where s* = s0 + v*T + v*Δv/(2√(a*b))
+///
+/// This naturally produces:
+///  • free-flow at speed limit when road is clear
+///  • smooth braking as gap closes
+///  • cars enter gaps and then grow their following distance,
+///    NOT refuse to enter because the gap isn't already at cruise size
+///
+/// Zipper merge works by making main-road cars see connector occupants
+/// via IncomingConnectors and slow proportionally — creating the gap
+/// rather than waiting for one to appear by chance.
+/// </summary>
 public class AmbientDriver : VehicleAgent
 {
     Profile profile;
+    float   desiredSpeed;
+    float   acceleration       = 3f;   // m/s² — comfortable cruise accel
+    float   laneChangeCooldown = 0f;
+    const float LANE_CHANGE_COOLDOWN = 2f;
 
-    float desiredSpeed;
-    float acceleration       = 5f;
-    float laneChangeCooldown = 0f;
-
-    static readonly List<VehicleAgent> _empty = new();
-
-    public AmbientDriver()
-    {
-        profile = Profile.RandomProfile();
-    }
+    public AmbientDriver() { profile = Profile.RandomProfile(); }
 
     // ---------------------------------------------------------------
-    protected override float ComputePriority()
+    public override void Perceive(World world) => UpdatePerception(world);
+
+    protected override LaneLink SelectNextLink(NavigationGraph graph)
     {
-        float roadWeight  = RoadClassInfo.RightOfWayWeight(CurrentLane.Edge.RoadClass) * 0.5f;
-        float proximity   = 1f - Math.Min(1f, DistanceToEnd / 20f);
-        float urgency     = Math.Min(1f, WaitTime / 10f);
-        float kindPenalty = profile.Kindness * 0.3f;
-        float lawBonus    = profile.LawAbidance *
-                            TrafficLaw.RightOfWayScore(this, TargetNode?.Contenders ?? _empty) * 0.5f;
+        var links = graph.GetLinksFrom(CurrentLane);
 
-        return roadWeight + proximity + urgency - kindPenalty + lawBonus;
-    }
-
-    // ---------------------------------------------------------------
-    public override void Perceive(World world)
-    {
-        UpdatePerception(world);
-    }
-
-    /// <summary>
-    /// Only pick edges reachable from the current lane.
-    /// An edge is reachable if EntryLaneRequired == -1 (any lane)
-    /// or EntryLaneRequired == current LaneNumber.
-    /// Falls back to any edge if none match — handles disconnected test roads.
-    /// </summary>
-    protected override TrafficEdge SelectNextEdge(TrafficNode node)
-    {
-        if (node.Outgoing.Count == 0) return null;
-
-        // Collect edges reachable from current lane
-        var reachable = new List<TrafficEdge>();
-        foreach (var edge in node.Outgoing)
+        if (links.Count == 0)
         {
-            if (edge.EntryLaneRequired < 0 || edge.EntryLaneRequired == LaneNumber)
-                reachable.Add(edge);
+            foreach (var lane in CurrentLane.Edge.Lanes)
+            {
+                var fallback = graph.GetLinksFrom(lane);
+                if (fallback.Count > 0)
+                    return fallback[rng.Next(fallback.Count)];
+            }
+            return null;
         }
 
-        // Pick randomly from reachable — if none match fall back to all outgoing
-        var candidates = reachable.Count > 0 ? reachable : node.Outgoing;
+        if (OnConnector) return links[0];
+
+        var direct = new List<LaneLink>();
+        foreach (var link in links)
+            if (link.SourceLane == CurrentLane)
+                direct.Add(link);
+
+        var candidates = direct.Count > 0 ? direct : links;
         return candidates[rng.Next(candidates.Count)];
     }
 
@@ -62,64 +61,41 @@ public class AmbientDriver : VehicleAgent
     public override void Deliberate(World world)
     {
         laneChangeCooldown -= world.DeltaTime;
-        ConsiderLaneChange(world);
+        ConsiderLaneChange();
         ChooseSpeed(world);
     }
 
-    void ConsiderLaneChange(World world)
+    void ConsiderLaneChange()
     {
+        if (IsChangingLane)          return;
         if (laneChangeCooldown > 0f) return;
+        if (OnConnector)             return;
         if (CurrentLane.Edge.Lanes.Count < 2) return;
 
-        // Entry lane requirement — must be in specific lane before node
-        if (NeedsEntryLaneChange)
+        // Priority 1: must migrate toward DesiredLane for routing
+        if (DesiredLane >= 0 && DesiredLane != LaneNumber)
         {
-            float urgency   = 1f - Math.Min(1f, DistanceToEnd / (CurrentLane.Edge.Length * 0.5f));
-            float threshold = 1f - profile.LaneChangeAggression * 0.5f;
-            if (urgency < threshold) return;
-
-            float margin = profile.MinFollowingDistance * (1f - urgency * 0.5f);
-            if (TryChangeLane(RequiredLane, margin))
-                laneChangeCooldown = 1f;
-
+            float progress = 1f - Math.Min(1f, DistanceToEnd / CurrentLane.Edge.Length);
+            if (progress > 0.2f)
+            {
+                int dir    = DesiredLane > LaneNumber ? 1 : -1;
+                int target = LaneNumber + dir;
+                if (BeginLaneChange(target))
+                    laneChangeCooldown = LANE_CHANGE_COOLDOWN;
+            }
             return;
         }
 
-        // Must merge — lane disappears on next edge
-        if (MustMerge)
-        {
-            float urgency   = 1f - Math.Min(1f, DistanceToEnd / (CurrentLane.Edge.Length * 0.5f));
-            float threshold = 1f - profile.Kindness * 0.7f;
-            if (urgency < threshold) return;
-
-            float margin = profile.MinFollowingDistance * (1f - urgency * 0.7f);
-            if (TryChangeLane(LaneNumber - 1, margin))
-                laneChangeCooldown = 1f;
-
-            return;
-        }
-
-        // Opportunistic — blocked ahead
+        // Priority 2: opportunistic — blocked ahead
         if (GapAhead > profile.MinFollowingDistance * 2f) return;
-
-        float roll = (float)rng.NextDouble();
-        if (roll > profile.LaneChangeAggression) return;
+        if ((float)rng.NextDouble() > 0.15f) return;
 
         int[] candidates = { LaneNumber - 1, LaneNumber + 1 };
         foreach (int target in candidates)
         {
-            float margin = profile.MinFollowingDistance;
-
-            var behind = target < LaneNumber ? BehindOnLeft : BehindOnRight;
-            if (behind != null)
+            if (BeginLaneChange(target))
             {
-                float closing = Math.Max(0f, behind.Speed - Speed);
-                margin += closing * 1.5f;
-            }
-
-            if (TryChangeLane(target, margin))
-            {
-                laneChangeCooldown = 3f * (1f - profile.LaneChangeAggression) + 1f;
+                laneChangeCooldown = LANE_CHANGE_COOLDOWN;
                 break;
             }
         }
@@ -127,67 +103,123 @@ public class AmbientDriver : VehicleAgent
 
     void ChooseSpeed(World world)
     {
-        float speedLimit = TrafficLaw.SpeedLimitMs(this);
-        desiredSpeed     = speedLimit * profile.DesiredSpeedFactor;
+        float v0 = TrafficLaw.SpeedLimitMs(this) * profile.DesiredSpeedFactor; // desired speed
+        float a  = acceleration;
+        float b  = 4f;    // comfortable braking deceleration m/s²
+        float s0 = profile.MinFollowingDistance;
+        float T  = profile.DesiredTimeGap;
 
-        if (profile.LawAbidance > 0.8f)
-            desiredSpeed = Math.Min(desiredSpeed, speedLimit);
+        // IDM acceleration
+        float idmAccel = a * (1f - IDMPow4(Speed / Math.Max(v0, 0.1f)));
 
-        if (GapAhead < profile.MinFollowingDistance && AheadOnLane != null)
+        // Car-following term: only when there is a vehicle ahead
+        if (AheadOnLane != null && GapAhead < float.MaxValue / 2f)
         {
-            float followFactor = Math.Max(0f, GapAhead / profile.MinFollowingDistance);
-            desiredSpeed = Math.Min(desiredSpeed, AheadOnLane.Speed * followFactor);
+            float deltaV = Speed - AheadOnLane.Speed;          // approach rate (positive = closing)
+            float sStar  = s0 + Speed * T
+                         + Speed * deltaV / (2f * (float)Math.Sqrt(a * b));
+            sStar = Math.Max(s0, sStar);                       // never less than min gap
+
+            float ratio = sStar / Math.Max(GapAhead, 0.01f);
+            idmAccel   -= a * ratio * ratio;                    // IDM braking term
         }
 
-        if (IsYieldingToMerger())
-            desiredSpeed *= 1f - (profile.Kindness * 0.25f);
+        // Zipper merge — yield to cars inside connectors that feed our lane.
+        // This creates the gap rather than waiting for one to appear.
+        float zipperCap = ZipperCap(world.Navigation);
 
-        if (MustMerge)
+        // Slow while lane-changing
+        if (IsChangingLane) idmAccel -= a * 0.5f;
+
+        // Slow proactively when a required lane change is running out of road
+        if (DesiredLane >= 0 && DesiredLane != LaneNumber)
         {
-            float urgency = 1f - Math.Min(1f, DistanceToEnd / (CurrentLane.Edge.Length * 0.5f));
-            if (urgency > 0.8f)
-                desiredSpeed *= 1f - (urgency - 0.8f) * 2f;
+            float urgency = 1f - Math.Min(1f, DistanceToEnd / CurrentLane.Edge.Length);
+            if (urgency > 0.5f)
+                idmAccel -= a * (urgency - 0.5f) * 1.2f;
         }
 
-        if (NeedsEntryLaneChange)
-        {
-            float urgency = 1f - Math.Min(1f, DistanceToEnd / (CurrentLane.Edge.Length * 0.5f));
-            if (urgency > 0.6f)
-                desiredSpeed *= 1f - (urgency - 0.6f) * 1.5f;
-        }
+        // Junction entry guard
+        float junctionCap = JunctionEntryCap(world.Navigation);
 
-        if (profile.LawAbidance > 0.3f &&
-            TrafficLaw.MustYieldToRoundabout(this) &&
-            TrafficLaw.IsRoundaboutOccupied(this, world.Agents))
-        {
-            desiredSpeed = Math.Min(desiredSpeed, ComputeBrakingSpeed(DistanceToEnd));
-        }
+        // Roundabout yield
+        if (TrafficLaw.MustYieldToRoundabout(this) && TrafficLaw.IsRoundaboutOccupied(this))
+            junctionCap = Math.Min(junctionCap, ComputeBrakingSpeed(DistanceToEnd));
 
-        desiredSpeed = ApplyBrakingConstraints(desiredSpeed);
-        Speed        = MoveTowards(Speed, desiredSpeed, acceleration * world.DeltaTime);
+        // Integrate speed
+        float newSpeed = Speed + idmAccel * world.DeltaTime;
+        newSpeed = Math.Max(0f, newSpeed);                     // never reverse
+        newSpeed = Math.Min(newSpeed, v0);                     // never exceed desired
+        newSpeed = Math.Min(newSpeed, junctionCap);
+        newSpeed = Math.Min(newSpeed, zipperCap);
+        newSpeed = ApplyBrakingConstraints(newSpeed);
+
+        Speed = newSpeed;
     }
 
-    bool IsYieldingToMerger()
+    // IDM uses v^4 normalisation for free-flow term
+    static float IDMPow4(float x)
     {
-        if (profile.Kindness < 0.3f) return false;
-
-        var leftLane  = CurrentLane.Edge.GetLeftLane(LaneNumber);
-        var rightLane = CurrentLane.Edge.GetRightLane(LaneNumber);
-
-        return CheckLaneForMerger(leftLane) || CheckLaneForMerger(rightLane);
+        float x2 = x * x;
+        return x2 * x2;
     }
 
-    bool CheckLaneForMerger(Lane lane)
+    /// <summary>
+    /// Zipper merge speed cap.
+    ///
+    /// For each connector lane that feeds into our current lane, if it has
+    /// a vehicle in it we slow down to create a gap at the merge point —
+    /// exactly like a zipper merge in real traffic.
+    ///
+    /// Returns a speed cap (float.MaxValue = no restriction).
+    /// </summary>
+    float ZipperCap(NavigationGraph nav)
     {
-        if (lane == null) return false;
-        var nearby = lane.GetVehicleAheadAt(Position - Length * 2f);
-        if (nearby == null) return false;
-        float dist = Math.Abs(nearby.Position - Position);
-        return dist < Length * 3f && nearby.MustMerge;
+        if (OnConnector) return float.MaxValue;
+
+        float cap = float.MaxValue;
+
+        foreach (var conn in CurrentLane.IncomingConnectors)
+        {
+            if (conn.Vehicles.Count == 0) continue;
+
+            // Find where this connector exits onto our lane
+            var exitLinks = nav.GetLinksFrom(conn);
+            if (exitLinks.Count == 0) continue;
+
+            float mergePos = exitLinks[0].MergePosition * CurrentLane.Edge.Length;
+
+            // How far are we from the merge point?
+            float distToMerge = mergePos - Position;
+
+            // Only yield if we're approaching the merge (it's ahead of us)
+            // and within a reasonable lookahead distance
+            float lookahead = Math.Max(Speed * 3f, 20f);
+            if (distToMerge < 0f || distToMerge > lookahead) continue;
+
+            // The connector vehicle's speed tells us what gap they'll need
+            var merging = conn.Vehicles[conn.Vehicles.Count - 1]; // frontmost
+
+            // We want to arrive at the merge point just *after* the merging
+            // car does — classic zipper. Cap our speed so the merging car
+            // gets there first.
+            float timeToMerge    = distToMerge / Math.Max(Speed, 0.1f);
+            float connProgress   = merging.Position / Math.Max(conn.Edge.Length, 0.1f);
+            float connRemaining  = (1f - connProgress) * conn.Edge.Length;
+            float mergingArrival = connRemaining / Math.Max(merging.Speed, 0.1f);
+
+            // If the merging car arrives before us — we don't need to slow
+            if (mergingArrival < timeToMerge) continue;
+
+            // We'd arrive first — slow so they can slot in ahead of us.
+            // Target: arrive at mergePoint just after merging car + one car length gap.
+            float targetArrival = mergingArrival + (Length / Math.Max(merging.Speed, 1f));
+            float targetSpeed   = distToMerge / Math.Max(targetArrival, 0.01f);
+            cap = Math.Min(cap, Math.Max(0f, targetSpeed));
+        }
+
+        return cap;
     }
 
-    public override void Act(World world)
-    {
-        Move(world);
-    }
+    public override void Act(World world) => Move(world);
 }

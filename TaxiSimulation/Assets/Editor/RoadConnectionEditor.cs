@@ -19,12 +19,12 @@ public class RoadConnectionEditor : Editor
 
         if (conn.SourceRoad != null)
         {
-            var sourceLaneProp = serializedObject.FindProperty("SourceLane");
-            sourceLaneProp.intValue = EditorGUILayout.IntSlider(
-                "Source Lane", sourceLaneProp.intValue, 0, conn.SourceRoad.LaneCount - 1);
+            var prop = serializedObject.FindProperty("SourceLane");
+            prop.intValue = EditorGUILayout.IntSlider(
+                "Source Lane", prop.intValue, 0, conn.SourceRoad.LaneCount - 1);
 
             EditorGUI.BeginDisabledGroup(true);
-            EditorGUILayout.LabelField("connects from end face of", conn.SourceRoad.name);
+            EditorGUILayout.LabelField("exits from end face of", conn.SourceRoad.name);
             EditorGUI.EndDisabledGroup();
         }
         else
@@ -40,24 +40,18 @@ public class RoadConnectionEditor : Editor
 
         if (conn.TargetRoad != null)
         {
-            var targetLaneProp = serializedObject.FindProperty("TargetLane");
-            targetLaneProp.intValue = EditorGUILayout.IntSlider(
-                "Target Lane (Entry)", targetLaneProp.intValue, 0, conn.TargetRoad.LaneCount - 1);
+            var prop = serializedObject.FindProperty("TargetLane");
+            prop.intValue = EditorGUILayout.IntSlider(
+                "Target Lane", prop.intValue, 0, conn.TargetRoad.LaneCount - 1);
 
             EditorGUI.BeginDisabledGroup(true);
-            EditorGUILayout.LabelField("connects to start face of", conn.TargetRoad.name);
+            EditorGUILayout.LabelField("enters start face of", conn.TargetRoad.name);
             EditorGUI.EndDisabledGroup();
         }
         else
         {
             EditorGUILayout.HelpBox("Assign a Target Road.", MessageType.Warning);
         }
-
-        EditorGUILayout.Space(6);
-
-        // ---- Road Class ----
-        EditorGUILayout.LabelField("Connection", EditorStyles.boldLabel);
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("RoadClass"));
 
         EditorGUILayout.Space(6);
 
@@ -68,20 +62,27 @@ public class RoadConnectionEditor : Editor
             var builder = FindFirstObjectByType<NavGraphBuilder>();
             if (builder != null) metersPerUnit = builder.metersPerUnit;
 
-            float meters = conn.WorldLength * metersPerUnit;
+            float mergePos = conn.ComputeMergePosition(metersPerUnit);
+            bool  straight = mergePos < 0.01f;
+            bool  samePRoad = conn.SourceRoad.ParentRoad == conn.TargetRoad.ParentRoad;
+
+            string kind = samePRoad
+                ? "Same-road continuation (auto-linked by NavGraphBuilder)"
+                : straight
+                    ? "Straight entry (merge position ≈ 0)"
+                    : $"Side merge at {mergePos:P0} along target lane";
 
             EditorGUILayout.HelpBox(
-                $"✓ Valid connection\n" +
-                $"{conn.SourceRoad.name} Lane {conn.SourceLane} → " +
-                $"{conn.TargetRoad.name} Lane {conn.TargetLane}\n" +
-                $"Length: {meters:F1} m\n" +
-                $"EntryLaneRequired: {conn.TargetLane}",
+                $"✓ Valid\n" +
+                $"{conn.SourceRoad.name} L{conn.SourceLane}  →  " +
+                $"{conn.TargetRoad.name} L{conn.TargetLane}\n" +
+                $"{kind}",
                 MessageType.Info);
         }
         else
         {
             EditorGUILayout.HelpBox(
-                "Connection is incomplete — assign both roads and valid lane indices.",
+                "Incomplete — assign both roads and valid lane indices.",
                 MessageType.Error);
         }
 

@@ -1,5 +1,14 @@
 using System.Collections.Generic;
 
+/// <summary>
+/// A directed road segment between two nodes.
+/// Contains N lanes, each of which cars travel along.
+///
+/// IsConnector = true marks synthetic junction-bridging edges created by
+/// NavGraphBuilder. Connector edges are typically very short (1–10 m) and
+/// single-lane. VehicleAgent skips stop-line braking on connector edges so
+/// that cars shorter or longer than the connector still flow through cleanly.
+/// </summary>
 public class TrafficEdge
 {
     public TrafficNode from;
@@ -10,17 +19,11 @@ public class TrafficEdge
     public RoadClass RoadClass;
 
     /// <summary>
-    /// Which lane number a vehicle must be in to enter this edge.
-    /// -1 means any lane is acceptable.
+    /// True for synthetic connector edges that bridge two road segments.
+    /// Connector lanes are never despawn points and never trigger stop-line
+    /// braking — cars flow through them purely on following-distance logic.
     /// </summary>
-    public int EntryLaneRequired = -1;
-
-    /// <summary>
-    /// True for edges created by RoadConnection — the arc between two road segments.
-    /// SimulationManager will not despawn vehicles on connection edges even if the
-    /// end node has no outgoing edges (it does — to the target road).
-    /// </summary>
-    public bool IsConnection = false;
+    public bool IsConnector { get; set; }
 
     public List<Lane> Lanes = new();
 
@@ -30,15 +33,21 @@ public class TrafficEdge
         this.to   = to;
     }
 
+    // ---------------------------------------------------------------
+    // Lane neighbours — for lateral perception queries
+    // ---------------------------------------------------------------
+
+    /// <summary>Lane to the left (lower index). Null at leftmost.</summary>
     public Lane GetLeftLane(int laneNumber)
     {
-        int target = laneNumber - 1;
-        return target >= 0 ? Lanes[target] : null;
+        int t = laneNumber - 1;
+        return (t >= 0 && t < Lanes.Count) ? Lanes[t] : null;
     }
 
+    /// <summary>Lane to the right (higher index). Null at rightmost.</summary>
     public Lane GetRightLane(int laneNumber)
     {
-        int target = laneNumber + 1;
-        return target < Lanes.Count ? Lanes[target] : null;
+        int t = laneNumber + 1;
+        return (t >= 0 && t < Lanes.Count) ? Lanes[t] : null;
     }
 }

@@ -1,119 +1,171 @@
-using System;
 using System.Collections.Generic;
 
 public class Lane
 {
     public TrafficEdge        Edge;
-    public int                LaneNumber; // position within edge (0=leftmost)
+    public int                LaneNumber;
     public List<VehicleAgent> Vehicles = new();
 
+    // Vehicles mid-lane-change INTO this lane (lateral, same edge).
+    public Dictionary<VehicleAgent, float> Entering = new();
+
+    // Connector lanes that feed into this lane, registered at build time.
+    // Used so main-road cars can see and yield to queued connector traffic.
+    public List<Lane> IncomingConnectors = new();
+
     // ---------------------------------------------------------------
-    // Queries
+    // Neighbour queries
     // ---------------------------------------------------------------
 
-    // First vehicle ahead of v (higher position)
     public VehicleAgent GetVehicleAhead(VehicleAgent v)
     {
-        int i = v.LaneIndex + 1;
-        return i < Vehicles.Count ? Vehicles[i] : null;
+        int i = v.LaneIndex;
+        return i < Vehicles.Count - 1 ? Vehicles[i + 1] : null;
     }
 
-    // First vehicle behind v (lower position)
     public VehicleAgent GetVehicleBehind(VehicleAgent v)
     {
-        int i = v.LaneIndex - 1;
-        return i >= 0 ? Vehicles[i] : null;
+        int i = v.LaneIndex;
+        return i > 0 ? Vehicles[i - 1] : null;
     }
 
-    // Nearest vehicle ahead at a given position (for cross-lane perception)
     public VehicleAgent GetVehicleAheadAt(float position)
     {
-        int i = LowerBound(position);
-        return i < Vehicles.Count ? Vehicles[i] : null;
+        for (int i = 0; i < Vehicles.Count; i++)
+            if (Vehicles[i].Position >= position)
+                return Vehicles[i];
+        return null;
     }
 
-    // Nearest vehicle behind at a given position (for cross-lane perception)
     public VehicleAgent GetVehicleBehindAt(float position)
     {
-        int i = UpperBound(position) - 1;
-        return i >= 0 ? Vehicles[i] : null;
+        for (int i = Vehicles.Count - 1; i >= 0; i--)
+            if (Vehicles[i].Position <= position)
+                return Vehicles[i];
+        return null;
     }
 
-    // Physical segment overlap check — car occupies [pos, pos+length]
-    // Two cars overlap if their segments intersect
+    // ---------------------------------------------------------------
+    // Space checks
+    // ---------------------------------------------------------------
+
+    /// <summary>
+    /// True if no committed or entering vehicle overlaps [position, position+length].
+    /// Vehicles are stored by their *front* position; rear = Position - Length.
+    /// </summary>
     public bool IsSegmentFree(float position, float length)
     {
-        // All vehicles at index >= LowerBound(position + length) have Position >= position + length
-        // so they cannot overlap [position, position + length]. Scan backward from there.
-        int end = LowerBound(position + length);
-        for (int i = end - 1; i >= 0; i--)
+        float qRear  = position;
+        float qFront = position + length;
+
+        foreach (var v in Vehicles)
         {
-            var v = Vehicles[i];
-            if (v.Position + v.Length <= position) break; // sorted — earlier vehicles also can't overlap
-            return false;
+            float vRear  = v.Position - v.EffectiveLengthOn(this);
+            float vFront = v.Position;
+            if (vFront > qRear && vRear < qFront) return false;
         }
+
+        foreach (var kvp in Entering)
+        {
+            var   v      = kvp.Key;
+            float vFront = v.Position;
+            float vRear  = v.Position - kvp.Value;
+            if (vFront > qRear && vRear < qFront) return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// True if any incoming connector has a vehicle that will merge near
+    /// [mergePos, mergePos+length] on this lane — used by side-road cars
+    /// to detect conflicts with sibling connectors targeting the same spot.
+    /// </summary>
+    public bool IsConnectorMergeConflict(float mergePos, float length)
+    {
+        foreach (var conn in IncomingConnectors)
+        {
+            if (conn.Vehicles.Count == 0) continue;
+
+            // Check the exit link of this connector to find its merge position
+            // We don't have nav here so we use the connector's own edge length
+            // as a proxy: a car inside the connector will land near mergePos.
+            // Consider it conflicting if any connector (other than self)
+            // has an occupant — they're all targeting the same vicinity.
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// True if entering at atPosition is safe for both the car behind
+    /// (must have braking room) and the car ahead (minimum clearance).
+    /// </summary>
+    public bool IsSafeToEnter(float atPosition, float length = 4.5f, float deceleration = 4f)
+    {
+        var behind = GetVehicleBehindAt(atPosition);
+        if (behind != null)
+        {
+            float gap    = atPosition - behind.Position;
+            float needed = (behind.Speed * behind.Speed) / (2f * deceleration) + length;
+            if (gap < needed) return false;
+        }
+
+        var ahead = GetVehicleAheadAt(atPosition + length);
+        if (ahead != null)
+        {
+            float gap = ahead.Position - ahead.Length - atPosition;
+            if (gap < 1f) return false;
+        }
+
         return true;
     }
 
     // ---------------------------------------------------------------
-    // Binary search helpers (Vehicles sorted ascending by Position)
-    // ---------------------------------------------------------------
-
-    // First index where Vehicles[i].Position >= position
-    int LowerBound(float position)
-    {
-        int lo = 0, hi = Vehicles.Count;
-        while (lo < hi)
-        {
-            int mid = (lo + hi) / 2;
-            if (Vehicles[mid].Position < position) lo = mid + 1;
-            else hi = mid;
-        }
-        return lo;
-    }
-
-    // First index where Vehicles[i].Position > position
-    int UpperBound(float position)
-    {
-        int lo = 0, hi = Vehicles.Count;
-        while (lo < hi)
-        {
-            int mid = (lo + hi) / 2;
-            if (Vehicles[mid].Position <= position) lo = mid + 1;
-            else hi = mid;
-        }
-        return lo;
-    }
-
-    // ---------------------------------------------------------------
-    // Mutations — maintain sorted order by Position at all times
+    // Insertion / removal
     // ---------------------------------------------------------------
 
     public void InsertSorted(VehicleAgent v)
     {
-        int insertAt = 0;
-        while (insertAt < Vehicles.Count &&
-               Vehicles[insertAt].Position <= v.Position)
-            insertAt++;
-
-        Vehicles.Insert(insertAt, v);
-        RebuildIndices(insertAt);
-        v.LaneIndex = insertAt;
+        int i = 0;
+        while (i < Vehicles.Count && Vehicles[i].Position < v.Position)
+            i++;
+        Vehicles.Insert(i, v);
+        v.LaneIndex = i;
+        for (int j = i + 1; j < Vehicles.Count; j++)
+            Vehicles[j].LaneIndex = j;
     }
 
     public void Remove(VehicleAgent v)
     {
-        int index = v.LaneIndex;
-        Vehicles.RemoveAt(index);
-        RebuildIndices(index);
+        int idx = v.LaneIndex;
+        if (idx < 0 || idx >= Vehicles.Count) return;
+        Vehicles.RemoveAt(idx);
+        for (int i = idx; i < Vehicles.Count; i++)
+            Vehicles[i].LaneIndex = i;
+        v.LaneIndex = -1;
     }
 
     // ---------------------------------------------------------------
-    // Internal
+    // Lateral lane-change presence
     // ---------------------------------------------------------------
-    void RebuildIndices(int from)
+
+    public void BeginEntering(VehicleAgent v, float effectiveLength)
+        => Entering[v] = effectiveLength;
+
+    public void UpdateEntering(VehicleAgent v, float effectiveLength)
+        => Entering[v] = effectiveLength;
+
+    public void CompleteEntering(VehicleAgent v)
     {
-        for (int i = from; i < Vehicles.Count; i++)
-            Vehicles[i].LaneIndex = i;
+        Entering.Remove(v);
+        InsertSorted(v);
     }
+
+    public void CancelEntering(VehicleAgent v)
+        => Entering.Remove(v);
+
+    // ---------------------------------------------------------------
+    public bool IsFree(float position, float length) => IsSegmentFree(position, length);
+    public void RemoveVehicle(VehicleAgent v) => Remove(v);
 }

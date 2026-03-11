@@ -3,49 +3,79 @@ using System.Collections.Generic;
 
 public class WorldView : MonoBehaviour
 {
-    [Header("Prefabs")]
-    public GameObject vehiclePrefab;
+    [Header("Vehicle prefabs")]
+    public GameObject ambientCarPrefab;
+    public GameObject taxiPrefab;
 
-    Dictionary<Lane, LaneView>           laneViews    = new();
-    Dictionary<VehicleAgent, GameObject> vehicleGOs   = new();
+    [Header("Pedestrian prefab")]
+    public GameObject pedestrianPrefab;
 
-    public void SetLaneViews(Dictionary<Lane, LaneView> views)
-    {
-        laneViews = views;
-    }
+    Dictionary<Lane, LaneView>           _laneViews     = new();
+    Dictionary<VehicleAgent, GameObject> _vehicleGOs    = new();
+    Dictionary<Pedestrian,   GameObject> _pedestrianGOs = new();
+
+    public void SetLaneViews(Dictionary<Lane, LaneView> views) => _laneViews = views;
 
     public LaneView GetLaneView(Lane lane)
     {
-        laneViews.TryGetValue(lane, out var view);
+        _laneViews.TryGetValue(lane, out var view);
         return view;
     }
 
-    // Spawn a single vehicle and register it
+    // ---------------------------------------------------------------
+    // Vehicles
+    // ---------------------------------------------------------------
+
     public void SpawnVehicle(VehicleAgent vehicle)
     {
-        if (vehicleGOs.ContainsKey(vehicle)) return;
+        if (_vehicleGOs.ContainsKey(vehicle)) return;
 
-        GameObject  go   = Instantiate(vehiclePrefab, transform);
-        VehicleView view = go.AddComponent<VehicleView>();
-        view.Agent     = vehicle;
+        var prefab = vehicle is AutonomousTaxi ? taxiPrefab : ambientCarPrefab;
+        if (prefab == null)
+        {
+            Debug.LogWarning($"[WorldView] No prefab assigned for {vehicle.GetType().Name}");
+            return;
+        }
+
+        var go        = Instantiate(prefab, transform);
+        var view      = go.AddComponent<VehicleView>();
+        view.Agent    = vehicle;
         view.WorldView = this;
 
-        vehicleGOs[vehicle] = go;
+        _vehicleGOs[vehicle] = go;
     }
 
-    // Destroy a vehicle's GameObject and unregister it
     public void DestroyVehicle(VehicleAgent vehicle)
     {
-        if (!vehicleGOs.TryGetValue(vehicle, out var go)) return;
-        vehicleGOs.Remove(vehicle);
+        if (!_vehicleGOs.TryGetValue(vehicle, out var go)) return;
+        _vehicleGOs.Remove(vehicle);
         Destroy(go);
     }
 
-    // Legacy batch spawn — kept for compatibility
-    public void SpawnVehicles(List<Agent> agents)
+    // ---------------------------------------------------------------
+    // Pedestrians
+    // ---------------------------------------------------------------
+
+    public void SpawnPedestrian(Pedestrian p)
     {
-        foreach (var agent in agents)
-            if (agent is VehicleAgent v)
-                SpawnVehicle(v);
+        if (_pedestrianGOs.ContainsKey(p)) return;
+        if (pedestrianPrefab == null)
+        {
+            Debug.LogWarning("[WorldView] pedestrianPrefab not assigned.");
+            return;
+        }
+
+        var go   = Instantiate(pedestrianPrefab, p.WorldPosition, Quaternion.identity, transform);
+        var view = go.AddComponent<PedestrianView>();
+        view.Bind(p);
+
+        _pedestrianGOs[p] = go;
+    }
+
+    public void DestroyPedestrian(Pedestrian p)
+    {
+        if (!_pedestrianGOs.TryGetValue(p, out var go)) return;
+        _pedestrianGOs.Remove(p);
+        Destroy(go);
     }
 }

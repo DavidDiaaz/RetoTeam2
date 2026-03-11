@@ -49,22 +49,18 @@ public class GraphDebugger : EditorWindow
         var graph = builder.Build(out var laneViews);
         var sb    = new StringBuilder();
 
-        // Count edges
-        var allEdges  = new List<TrafficEdge>();
-        int connEdges = 0, roadEdges = 0;
-
+        // Collect all edges
+        var seen     = new HashSet<TrafficEdge>();
+        var allEdges = new List<TrafficEdge>();
         foreach (var node in graph.nodes.Values)
             foreach (var edge in node.Outgoing)
-            {
-                allEdges.Add(edge);
-                if (edge.IsConnection) connEdges++;
-                else roadEdges++;
-            }
+                if (seen.Add(edge)) allEdges.Add(edge);
 
         sb.AppendLine("=== GRAPH INSPECTION REPORT ===");
-        sb.AppendLine($"Nodes : {graph.nodes.Count}");
-        sb.AppendLine($"Edges : {allEdges.Count}  (road={roadEdges}  connection={connEdges})");
-        sb.AppendLine($"Lanes : {laneViews.Count}");
+        sb.AppendLine($"Nodes     : {graph.nodes.Count}");
+        sb.AppendLine($"Edges     : {allEdges.Count}");
+        sb.AppendLine($"LaneLinks : {graph.links.Count}");
+        sb.AppendLine($"LaneViews : {laneViews.Count}");
         sb.AppendLine();
 
         // ---- Nodes ----
@@ -74,11 +70,11 @@ public class GraphDebugger : EditorWindow
             var    node  = kvp.Value;
             string label = node.Label != "" ? $"[{node.Label}]" : "";
             string light = node.Light != null
-                ? $"[LIGHT g={node.Light.GreenDuration}s y={node.Light.YellowDuration}s r={node.Light.RedDuration}s]"
+                ? $" [LIGHT g={node.Light.GreenDuration}s y={node.Light.YellowDuration}s r={node.Light.RedDuration}s]"
                 : "";
 
             if (node.Outgoing.Count == 0)
-                sb.AppendLine($"  Node {node.id} {label}  TERMINAL  {light}");
+                sb.AppendLine($"  Node {node.id} {label}  TERMINAL{light}");
             else
             {
                 sb.Append($"  Node {node.id} {label}  → ");
@@ -87,80 +83,67 @@ public class GraphDebugger : EditorWindow
                 sb.AppendLine(light);
             }
         }
-
         sb.AppendLine();
 
         // ---- Edges ----
         sb.AppendLine("--- EDGES ---");
         foreach (var edge in allEdges)
         {
-            string kind  = edge.IsConnection ? "CONN" : "ROAD";
-            string entry = edge.EntryLaneRequired >= 0 ? $"entryReq={edge.EntryLaneRequired}" : "entryReq=any";
             string lanes = "";
-            for (int i = 0; i < edge.Lanes.Count; i++) lanes += $"L{i} ";
-
+            for (int i = 0; i < edge.Lanes.Count; i++)
+            {
+                int linkCount = graph.GetLinksFrom(edge.Lanes[i]).Count;
+                lanes += $"L{i}({linkCount}out) ";
+            }
             sb.AppendLine(
-                $"  {kind}  [{edge.from.Label}]→[{edge.to.Label}]  " +
-                $"{edge.Length:F1}m  {edge.SpeedLimit}km/h  " +
-                $"lanes=[{lanes.Trim()}]  {entry}");
+                $"  [{edge.from.Label}]→[{edge.to.Label}]  " +
+                $"{edge.Length:F1}m  {edge.SpeedLimit}km/h  [{lanes.Trim()}]");
         }
+        sb.AppendLine();
 
+        // ---- Lane Links ----
+        sb.AppendLine("--- LANE LINKS ---");
+        foreach (var link in graph.links)
+        {
+            string kind = link.IsStraight ? "straight" : $"merge@{link.MergePosition:F2}";
+            sb.AppendLine(
+                $"  [{link.SourceLane.Edge.from.Label}→{link.SourceLane.Edge.to.Label}] " +
+                $"L{link.SourceLane.LaneNumber}  →  " +
+                $"[{link.DestLane.Edge.from.Label}→{link.DestLane.Edge.to.Label}] " +
+                $"L{link.DestLane.LaneNumber}  ({kind})");
+        }
         sb.AppendLine();
 
         // ---- Connectivity warnings ----
         sb.AppendLine("--- CONNECTIVITY WARNINGS ---");
         bool clean = true;
 
-        // Connection to terminal
-        foreach (var node in graph.nodes.Values)
-        {
-            if (node.Outgoing.Count > 0) continue;
-            foreach (var other in graph.nodes.Values)
-                foreach (var e in other.Outgoing)
-                    if (e.to == node && e.IsConnection)
-                    {
-                        sb.AppendLine($"  ⚠ [{node.Label}] is TERMINAL but has incoming CONNECTION — target segment may be missing.");
-                        clean = false;
-                    }
-        }
-
-        // entryReq out of range
         foreach (var edge in allEdges)
         {
-            if (!edge.IsConnection || edge.EntryLaneRequired < 0) continue;
-            foreach (var outEdge in edge.to.Outgoing)
+            if (edge.to.Outgoing.Count == 0) continue; // terminal — OK
+
+            for (int i = 0; i < edge.Lanes.Count; i++)
             {
-                if (outEdge.IsConnection) continue;
-                if (edge.EntryLaneRequired >= outEdge.Lanes.Count)
+                var links = graph.GetLinksFrom(edge.Lanes[i]);
+                if (links.Count == 0)
                 {
                     sb.AppendLine(
-                        $"  ⚠ CONN [{edge.from.Label}→{edge.to.Label}] " +
-                        $"entryReq={edge.EntryLaneRequired} but target has only {outEdge.Lanes.Count} lane(s).");
+                        $"  ⚠ [{edge.from.Label}→{edge.to.Label}] " +
+                        $"L{i} has NO outgoing LaneLink — vehicle will be stuck.");
                     clean = false;
                 }
             }
         }
 
-        // Lane with no reachable outgoing
-        foreach (var edge in allEdges)
+        // Check merge positions are reasonable
+        foreach (var link in graph.links)
         {
-            if (edge.IsConnection) continue;
-            if (edge.to.Outgoing.Count == 0) continue;
-
-            for (int lane = 0; lane < edge.Lanes.Count; lane++)
+            if (!link.IsStraight && (link.MergePosition < 0f || link.MergePosition > 1f))
             {
-                bool reachable = false;
-                foreach (var outEdge in edge.to.Outgoing)
-                    if (outEdge.EntryLaneRequired < 0 || outEdge.EntryLaneRequired == lane)
-                    { reachable = true; break; }
-
-                if (!reachable)
-                {
-                    sb.AppendLine(
-                        $"  ⚠ [{edge.from.Label}→{edge.to.Label}] Lane {lane} " +
-                        $"has NO reachable outgoing connection — vehicle will be stuck.");
-                    clean = false;
-                }
+                sb.AppendLine(
+                    $"  ⚠ LaneLink {link.SourceLane.Edge.from.Label}→{link.DestLane.Edge.to.Label} " +
+                    $"has invalid MergePosition={link.MergePosition:F3}");
+                clean = false;
             }
         }
 
@@ -172,33 +155,43 @@ public class GraphDebugger : EditorWindow
         var roads = FindObjectsByType<Road>(FindObjectsSortMode.None);
         foreach (var road in roads)
         {
-            sb.AppendLine($"  {road.name}  {road.RoadClass}  {road.LaneCount} lanes  {road.SpeedLimit}km/h  {road.Segments.Count} segment(s)");
+            sb.AppendLine(
+                $"  {road.name}  {road.RoadClass}  {road.LaneCount} lanes  " +
+                $"{road.SpeedLimit}km/h  {road.Segments.Count} segment(s)");
             foreach (var seg in road.Segments)
             {
                 if (seg == null) continue;
-                float m     = seg.WorldLength * builder.metersPerUnit;
-                string lt   = seg.HasTrafficLight ? " [LIGHT]" : "";
+                float m   = seg.WorldLength * builder.metersPerUnit;
+                string lt = seg.HasTrafficLight ? " [LIGHT]" : "";
                 sb.AppendLine($"    {seg.name}  {m:F1}m{lt}");
             }
         }
-
         sb.AppendLine();
 
-        // ---- Connections ----
+        // ---- Road connections ----
         sb.AppendLine("--- ROAD CONNECTIONS ---");
         var conns = FindObjectsByType<RoadConnection>(FindObjectsSortMode.None);
         if (conns.Length == 0)
+        {
             sb.AppendLine("  (none)");
+        }
         else
+        {
             foreach (var conn in conns)
+            {
                 if (!conn.IsValid)
+                {
                     sb.AppendLine($"  ✗ {conn.name}  INVALID");
-                else
-                    sb.AppendLine(
-                        $"  ✓ {conn.name}  " +
-                        $"{conn.SourceRoad.name}[L{conn.SourceLane}] → " +
-                        $"{conn.TargetRoad.name}[L{conn.TargetLane}]  " +
-                        $"{conn.WorldLength * builder.metersPerUnit:F1}m");
+                    continue;
+                }
+                float mergePos = conn.ComputeMergePosition(builder.metersPerUnit);
+                string kind    = mergePos < 0.01f ? "straight" : $"merge@{mergePos:F2}";
+                sb.AppendLine(
+                    $"  ✓ {conn.name}  " +
+                    $"{conn.SourceRoad.name}[L{conn.SourceLane}] → " +
+                    $"{conn.TargetRoad.name}[L{conn.TargetLane}]  ({kind})");
+            }
+        }
 
         report = sb.ToString();
         built  = true;
