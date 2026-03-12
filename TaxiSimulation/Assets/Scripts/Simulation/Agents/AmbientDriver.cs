@@ -17,14 +17,12 @@ using System.Collections.Generic;
 /// Zipper merge works by making main-road cars see connector occupants
 /// via IncomingConnectors and slow proportionally — creating the gap
 /// rather than waiting for one to appear by chance.
-///
-/// Scale: 1 Unity unit = 3.5 m real-world. All distances in Unity units.
 /// </summary>
 public class AmbientDriver : VehicleAgent
 {
     Profile profile;
     float   desiredSpeed;
-    float   acceleration       = 0.86f;  // 3 m/s² / 3.5
+    float   acceleration       = 3f;   // m/s² — comfortable cruise accel
     float   laneChangeCooldown = 0f;
     const float LANE_CHANGE_COOLDOWN = 2f;
 
@@ -71,14 +69,16 @@ public class AmbientDriver : VehicleAgent
             float weight = 10f; // Peso base (todas las opciones tienen chance)
 
             // 1. Preferencia por seguir recto (fluidez natural)
-            if (link.IsStraight)
-                weight += 20f;
+            if (link.IsStraight) 
+                weight += 20f; 
 
             // 2. Repulsión suave al tráfico
+            // Si el perímetro se llena, las calles hacia el centro se vuelven más atractivas
             int trafficCount = link.DestLane.Vehicles.Count;
             weight -= trafficCount * 1.5f;
 
             // Nunca permitimos pesos negativos o cero absoluto
+            // Siempre hay al menos 1 boleto de lotería para cada giro posible
             weight = Math.Max(1f, weight);
 
             weights[i] = weight;
@@ -86,7 +86,7 @@ public class AmbientDriver : VehicleAgent
         }
 
         // Hacemos girar la ruleta (Tirar el dado)
-        float roll   = (float)rng.NextDouble() * totalWeight;
+        float roll = (float)rng.NextDouble() * totalWeight;
         float cursor = 0f;
 
         for (int i = 0; i < candidates.Count; i++)
@@ -145,9 +145,9 @@ public class AmbientDriver : VehicleAgent
 
     void ChooseSpeed(World world)
     {
-        float v0 = TrafficLaw.SpeedLimitMs(this) * profile.DesiredSpeedFactor;
+        float v0 = TrafficLaw.SpeedLimitMs(this) * profile.DesiredSpeedFactor; // desired speed
         float a  = acceleration;
-        float b  = 1.14f;   // comfortable braking: 4 m/s² / 3.5
+        float b  = 4f;    // comfortable braking deceleration m/s²
         float s0 = profile.MinFollowingDistance;
         float T  = profile.DesiredTimeGap;
 
@@ -167,6 +167,7 @@ public class AmbientDriver : VehicleAgent
         }
 
         // Zipper merge — yield to cars inside connectors that feed our lane.
+        // This creates the gap rather than waiting for one to appear.
         float zipperCap = ZipperCap(world.Navigation);
 
         // Slow while lane-changing
@@ -207,6 +208,11 @@ public class AmbientDriver : VehicleAgent
 
     /// <summary>
     /// Zipper merge speed cap.
+    ///
+    /// For each connector lane that feeds into our current lane, if it has
+    /// a vehicle in it we slow down to create a gap at the merge point —
+    /// exactly like a zipper merge in real traffic.
+    ///
     /// Returns a speed cap (float.MaxValue = no restriction).
     /// </summary>
     float ZipperCap(NavigationGraph nav)
@@ -219,37 +225,44 @@ public class AmbientDriver : VehicleAgent
         {
             if (conn.Vehicles.Count == 0) continue;
 
+            // Find where this connector exits onto our lane
             var exitLinks = nav.GetLinksFrom(conn);
             if (exitLinks.Count == 0) continue;
 
-            float mergePos    = exitLinks[0].MergePosition * CurrentLane.Edge.Length;
+            float mergePos = exitLinks[0].MergePosition * CurrentLane.Edge.Length;
+
+            // How far are we from the merge point?
             float distToMerge = mergePos - Position;
 
-            // Lookahead: 20m / 3.5 ≈ 5.7 units
-            float lookahead = Math.Max(Speed * 3f, 5.7f);
+            // Only yield if we're approaching the merge (it's ahead of us)
+            // and within a reasonable lookahead distance
+            float lookahead = Math.Max(Speed * 3f, 20f);
             if (distToMerge < 0f || distToMerge > lookahead) continue;
 
+            // The connector vehicle's speed tells us what gap they'll need
             var merging = conn.Vehicles[conn.Vehicles.Count - 1]; // frontmost
 
             // Skip stopped connector cars — yielding to them would cause a
-            // cascade freeze across the whole road network.
-            // 0.5 m/s / 3.5 ≈ 0.14 units/s
-            if (merging.Speed < 0.14f) continue;
+            // cascade freeze across the whole road network (targetSpeed → 0).
+            if (merging.Speed < 0.5f) continue;
 
+            // We want to arrive at the merge point just *after* the merging
+            // car does — classic zipper. Cap our speed so the merging car
+            // gets there first.
             float timeToMerge    = distToMerge / Math.Max(Speed, 0.1f);
             float connProgress   = merging.Position / Math.Max(conn.Edge.Length, 0.1f);
             float connRemaining  = (1f - connProgress) * conn.Edge.Length;
-            // floor: 0.14 units/s
-            float mergingArrival = connRemaining / Math.Max(merging.Speed, 0.14f);
+            float mergingArrival = connRemaining / Math.Max(merging.Speed, 0.5f);
 
             // If the merging car arrives before us — we don't need to slow
             if (mergingArrival < timeToMerge) continue;
 
             // We'd arrive first — slow so they can slot in ahead of us.
-            // Creep minimum: 1.5 m/s / 3.5 ≈ 0.43 units/s
-            float targetArrival = mergingArrival + (Length / Math.Max(merging.Speed, 0.43f));
+            // Target: arrive at mergePoint just after merging car + one car length gap.
+            // Clamp to a creep minimum so we never fully stop for a zipper.
+            float targetArrival = mergingArrival + (Length / Math.Max(merging.Speed, 1f));
             float targetSpeed   = distToMerge / Math.Max(targetArrival, 0.01f);
-            cap = Math.Min(cap, Math.Max(0.43f, targetSpeed));
+            cap = Math.Min(cap, Math.Max(1.5f, targetSpeed));
         }
 
         return cap;
@@ -265,6 +278,7 @@ public class AmbientDriver : VehicleAgent
     {
         Lane dest = link.DestLane;
 
+        // If the link goes to a connector, peek at where that connector exits
         if (dest.Edge.IsConnector)
         {
             var onward = graph.GetLinksFrom(dest);

@@ -40,8 +40,8 @@ public static class TrafficLaw
     // ---------------------------------------------------------------
 
     public static float SpeedLimitMs(VehicleAgent me)
-    => me.CurrentLane.Edge.SpeedLimit * (1000f / 3600f) / 3.5f;
-    
+        => me.CurrentLane.Edge.SpeedLimit * (1000f / 3600f);
+
     /// <summary>
     /// Roundabout occupancy — returns false until roundabout merge logic is implemented
     /// via LaneLink presence model.

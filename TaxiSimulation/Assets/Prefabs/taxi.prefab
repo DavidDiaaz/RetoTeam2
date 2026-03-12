@@ -48,29 +48,9 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: -7565218797614395058, guid: e2c471334812347668b1487b6f1277dd, type: 3}
-      propertyPath: m_Name
-      value: Body
-      objectReference: {fileID: 0}
-    - target: {fileID: -7517553526391017187, guid: e2c471334812347668b1487b6f1277dd, type: 3}
-      propertyPath: 'm_Materials.Array.data[5]'
-      value: 
-      objectReference: {fileID: 2100000, guid: 9b3e6289da1b14d06ab802e3cc882a54, type: 2}
-    - target: {fileID: -5899143428350410890, guid: e2c471334812347668b1487b6f1277dd, type: 3}
-      propertyPath: m_Name
-      value: FrontLeftWheel
-      objectReference: {fileID: 0}
-    - target: {fileID: -2062983467888690987, guid: e2c471334812347668b1487b6f1277dd, type: 3}
-      propertyPath: m_Name
-      value: FrontRightWheel
-      objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: e2c471334812347668b1487b6f1277dd, type: 3}
       propertyPath: m_Name
       value: taxi
-      objectReference: {fileID: 0}
-    - target: {fileID: 8614041352547765575, guid: e2c471334812347668b1487b6f1277dd, type: 3}
-      propertyPath: m_Name
-      value: RearWheels
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

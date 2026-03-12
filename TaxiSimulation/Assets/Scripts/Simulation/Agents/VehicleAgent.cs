@@ -17,7 +17,7 @@ public abstract class VehicleAgent : Agent
     public int   LaneNumber;
     public float Position;
     public float Speed;
-    public float Length = 1.29f;   // 4.5m / 3.5 m·per·unit ≈ 1.29 units
+    public float Length = 4.5f;
 
     // ---------------------------------------------------------------
     // Lane change state
@@ -64,11 +64,12 @@ public abstract class VehicleAgent : Agent
 
     float _waitTime = 0f;
     float _logTimer = 0f;
-    const float STUCK_THRESHOLD    = 5f;    // seconds — unchanged
+    const float STUCK_THRESHOLD    = 5f;
 
+    /// <summary>True when the car has been blocked at an edge transition for >= STUCK_THRESHOLD seconds.</summary>
     protected bool IsStuck => _waitTime >= STUCK_THRESHOLD;
     const float LOG_INTERVAL       = 3f;
-    const float LANE_CHANGE_METERS = 4.3f;  // 15m / 3.5
+    const float LANE_CHANGE_METERS = 15f;
 
     // ---------------------------------------------------------------
     protected void UpdatePerception(World world)
@@ -97,11 +98,10 @@ public abstract class VehicleAgent : Agent
 
         DistanceToEnd = CurrentLane.Edge.Length - Position;
 
-        // Red light lookahead: 20m / 3.5 ≈ 5.7 units
         RedLightAhead = !OnConnector
             && TargetNode?.Light != null
             && TargetNode.Light.CurrentState == TrafficLight.State.Red
-            && DistanceToEnd < 5.7f;
+            && DistanceToEnd < 20f;
 
         if (TargetLink == null)
         {
@@ -121,7 +121,7 @@ public abstract class VehicleAgent : Agent
     protected virtual float ComputePriority()
     {
         float roadWeight = RoadClassInfo.RightOfWayWeight(CurrentLane.Edge.RoadClass) * 0.5f;
-        float proximity  = 1f - Math.Min(1f, DistanceToEnd / 5.7f);  // scaled from 20m
+        float proximity  = 1f - Math.Min(1f, DistanceToEnd / 20f);
         float urgency    = Math.Min(1f, _waitTime / 10f);
         return roadWeight + proximity + urgency;
     }
@@ -134,8 +134,7 @@ public abstract class VehicleAgent : Agent
         return current + Math.Sign(target - current) * maxDelta;
     }
 
-    // Default decel: 4 m/s² / 3.5 ≈ 1.14 units/s²
-    protected float ComputeBrakingSpeed(float distance, float deceleration = 1.14f)
+    protected float ComputeBrakingSpeed(float distance, float deceleration = 4f)
         => (float)Math.Sqrt(2f * deceleration * Math.Max(0f, distance));
 
     protected float ApplyBrakingConstraints(float desired)
@@ -151,6 +150,18 @@ public abstract class VehicleAgent : Agent
     // ---------------------------------------------------------------
     // Junction entry guard
     // ---------------------------------------------------------------
+
+    /// <summary>
+    /// Returns a braking-speed cap when we should not yet enter the connector
+    /// ahead. Returns float.MaxValue when entry is clear.
+    ///
+    /// Checks in order:
+    ///  1. Another car already occupying the entry zone of OUR connector
+    ///  2. No space on the destination lane at the merge point
+    ///  3. A *sibling* connector (different lane, same dest) already occupied
+    ///     — prevents two connectors racing to the same merge point
+    ///  4. Side-entry yield: approaching main-road traffic has right of way
+    /// </summary>
     protected float JunctionEntryCap(NavigationGraph nav)
     {
         if (OnConnector)        return float.MaxValue;
@@ -162,12 +173,13 @@ public abstract class VehicleAgent : Agent
         Lane  connLane   = TargetLink.DestLane;
         float connLength = connLane.Edge.Length;
 
-        // 1. Entry zone occupied?
+        // 1. Is our connector's entry zone occupied?
+        //    (A car past the halfway point is nearly out — don't block for it)
         foreach (var v in connLane.Vehicles)
             if (v.Position < connLength * 0.6f)
                 return brakeTo;
 
-        // 2. Dest space check
+        // 2. Resolve exit and check dest space
         var exitLinks = nav.GetLinksFrom(connLane);
         if (exitLinks.Count == 0) return float.MaxValue;
 
@@ -178,42 +190,49 @@ public abstract class VehicleAgent : Agent
         if (!destLane.IsSegmentFree(mergePos, Length))
             return brakeTo;
 
-        // 3. Sibling connector conflict
+        // 3. Sibling connector conflict — another connector feeding the same
+        //    dest lane at the same merge point already has a car in it.
+        //    Use vehicle ID as a tiebreaker so two connectors don't deadlock
+        //    each other (lower ID = higher priority = gets to go first).
         foreach (var sibling in destLane.IncomingConnectors)
         {
-            if (sibling == connLane) continue;
-            if (sibling.Vehicles.Count == 0) continue;
+            if (sibling == connLane) continue;           // skip self
+            if (sibling.Vehicles.Count == 0) continue;  // sibling empty
 
+            // Check the sibling's exit merge position to see if it's the same spot
             var siblingLinks = nav.GetLinksFrom(sibling);
             if (siblingLinks.Count == 0) continue;
             float siblingMerge = siblingLinks[0].MergePosition * destLane.Edge.Length;
 
+            // Consider it a conflict if merge positions are within one car-length
             if (Math.Abs(siblingMerge - mergePos) >= Length * 1.5f) continue;
 
-            var siblingFront   = sibling.Vehicles[sibling.Vehicles.Count - 1];
-            bool siblingMoving = siblingFront.Speed > 0.14f;  // 0.5 m/s / 3.5
+            // Only yield to a sibling whose leading car is still moving.
+            // If the sibling is also stuck, lower ID wins to break the deadlock.
+            var siblingFront = sibling.Vehicles[sibling.Vehicles.Count - 1];
+            bool siblingMoving = siblingFront.Speed > 0.5f;
             if (siblingMoving || siblingFront.Id < Id)
                 return brakeTo;
         }
 
-        // 4. Side-entry yield
+        // 4. Side-entry: yield to approaching main-road traffic
         if (!exitLink.IsStraight)
         {
+            // Car approaching from behind the merge point on the main road
             var behind = destLane.GetVehicleBehindAt(mergePos);
             if (behind != null)
             {
                 float gap    = mergePos - behind.Position;
-                // (v² / 2b) + Length + 0.57  (2m / 3.5 ≈ 0.57)
-                float needed = (behind.Speed * behind.Speed) / (2f * 1.14f)
-                               + Length + 0.57f;
+                float needed = (behind.Speed * behind.Speed) / (2f * 4f) + Length + 2f;
                 if (gap < needed) return brakeTo;
             }
 
+            // Car ahead of the merge point — we need room to slot in
             var ahead = destLane.GetVehicleAheadAt(mergePos + Length);
             if (ahead != null)
             {
                 float gap = ahead.Position - ahead.Length - mergePos;
-                if (gap < 0.29f) return brakeTo;  // 1m / 3.5
+                if (gap < 1f) return brakeTo;
             }
         }
 
@@ -322,6 +341,8 @@ public abstract class VehicleAgent : Agent
 
         if (destLane.Edge.IsConnector)
         {
+            // Hard gate: connector entry zone must be clear.
+            // Bypassed when stuck too long to break circular deadlocks.
             if (!IsStuck)
             {
                 float connLen = destLane.Edge.Length;
@@ -340,6 +361,8 @@ public abstract class VehicleAgent : Agent
         }
         else
         {
+            // Exiting connector onto real lane.
+            // Bypassed when stuck too long to break circular deadlocks.
             if (!IsStuck)
             {
                 if (!destLane.IsSegmentFree(mergePos, Length))
@@ -355,7 +378,7 @@ public abstract class VehicleAgent : Agent
                 if (aheadInDest != null)
                 {
                     float gap         = aheadInDest.Position - aheadInDest.Length - mergePos;
-                    float brakingDist = (Speed * Speed) / (2f * 1.14f);  // scaled decel
+                    float brakingDist = (Speed * Speed) / (2f * 4f);
                     if (gap < brakingDist)
                     {
                         Speed      = 0;
@@ -367,6 +390,9 @@ public abstract class VehicleAgent : Agent
             }
         }
 
+        // ---------------------------------------------------------------
+        // Transition
+        // ---------------------------------------------------------------
         IsSignalling = true;
         _waitTime    = 0f;
 
@@ -381,6 +407,9 @@ public abstract class VehicleAgent : Agent
         DesiredLane = -1;
         destLane.InsertSorted(this);
 
+        // Short connector: don't recurse — let the next tick handle the exit
+        // so VehicleView gets at least one frame to render the connector path.
+        // Only recurse if we're not on a connector (avoids the visual snap).
         if (Position >= CurrentLane.Edge.Length && !CurrentLane.Edge.IsConnector)
             TryMoveToNextEdge(dt);
     }
