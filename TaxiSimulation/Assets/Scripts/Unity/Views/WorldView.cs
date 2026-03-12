@@ -62,13 +62,13 @@ public class WorldView : MonoBehaviour
     // Pedestrians
     // ---------------------------------------------------------------
 
-    public void SpawnPedestrian(Pedestrian p)
+    public GameObject SpawnPedestrianAndReturn(Pedestrian p)
     {
-        if (_pedestrianGOs.ContainsKey(p)) return;
+        if (_pedestrianGOs.TryGetValue(p, out var existing)) return existing;
         if (pedestrianPrefab == null)
         {
             Debug.LogWarning("[WorldView] pedestrianPrefab not assigned.");
-            return;
+            return null;
         }
 
         var go   = Instantiate(pedestrianPrefab, p.WorldPosition, Quaternion.identity, transform);
@@ -76,7 +76,10 @@ public class WorldView : MonoBehaviour
         view.Bind(p);
 
         _pedestrianGOs[p] = go;
+        return go;
     }
+
+    public void SpawnPedestrian(Pedestrian p) => SpawnPedestrianAndReturn(p);
 
     public void DestroyPedestrian(Pedestrian p)
     {

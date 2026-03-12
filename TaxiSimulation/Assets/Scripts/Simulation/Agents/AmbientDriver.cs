@@ -54,6 +54,12 @@ public class AmbientDriver : VehicleAgent
                 direct.Add(link);
 
         var candidates = direct.Count > 0 ? direct : links;
+
+        // Prefer links that don't lead to dead-end segments.
+        // Dead-end = the destination lane's edge ends at a terminal node (no outgoing).
+        var nonDeadEnd = candidates.FindAll(l => !IsDeadEndLink(l, graph));
+        if (nonDeadEnd.Count > 0) candidates = nonDeadEnd;
+
         return candidates[rng.Next(candidates.Count)];
     }
 
@@ -139,8 +145,8 @@ public class AmbientDriver : VehicleAgent
                 idmAccel -= a * (urgency - 0.5f) * 1.2f;
         }
 
-        // Junction entry guard
-        float junctionCap = JunctionEntryCap(world.Navigation);
+        // Junction entry guard — skipped when stuck to break circular deadlocks
+        float junctionCap = IsStuck ? float.MaxValue : JunctionEntryCap(world.Navigation);
 
         // Roundabout yield
         if (TrafficLaw.MustYieldToRoundabout(this) && TrafficLaw.IsRoundaboutOccupied(this))
@@ -200,26 +206,51 @@ public class AmbientDriver : VehicleAgent
             // The connector vehicle's speed tells us what gap they'll need
             var merging = conn.Vehicles[conn.Vehicles.Count - 1]; // frontmost
 
+            // Skip stopped connector cars — yielding to them would cause a
+            // cascade freeze across the whole road network (targetSpeed → 0).
+            if (merging.Speed < 0.5f) continue;
+
             // We want to arrive at the merge point just *after* the merging
             // car does — classic zipper. Cap our speed so the merging car
             // gets there first.
             float timeToMerge    = distToMerge / Math.Max(Speed, 0.1f);
             float connProgress   = merging.Position / Math.Max(conn.Edge.Length, 0.1f);
             float connRemaining  = (1f - connProgress) * conn.Edge.Length;
-            float mergingArrival = connRemaining / Math.Max(merging.Speed, 0.1f);
+            float mergingArrival = connRemaining / Math.Max(merging.Speed, 0.5f);
 
             // If the merging car arrives before us — we don't need to slow
             if (mergingArrival < timeToMerge) continue;
 
             // We'd arrive first — slow so they can slot in ahead of us.
             // Target: arrive at mergePoint just after merging car + one car length gap.
+            // Clamp to a creep minimum so we never fully stop for a zipper.
             float targetArrival = mergingArrival + (Length / Math.Max(merging.Speed, 1f));
             float targetSpeed   = distToMerge / Math.Max(targetArrival, 0.01f);
-            cap = Math.Min(cap, Math.Max(0f, targetSpeed));
+            cap = Math.Min(cap, Math.Max(1.5f, targetSpeed));
         }
 
         return cap;
     }
 
     public override void Act(World world) => Move(world);
+
+    /// <summary>
+    /// Returns true if following this link leads to a dead-end segment
+    /// (one whose end node has no outgoing edges in the navigation graph).
+    /// </summary>
+    static bool IsDeadEndLink(LaneLink link, NavigationGraph graph)
+    {
+        Lane dest = link.DestLane;
+
+        // If the link goes to a connector, peek at where that connector exits
+        if (dest.Edge.IsConnector)
+        {
+            var onward = graph.GetLinksFrom(dest);
+            dest = onward.Count > 0 ? onward[0].DestLane : null;
+        }
+
+        return dest == null
+            || dest.Edge.to == null
+            || dest.Edge.to.Outgoing.Count == 0;
+    }
 }

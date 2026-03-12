@@ -39,9 +39,15 @@ public class PedestrianView : MonoBehaviour
         if (Pedestrian == null) return;
         _lastState = Pedestrian.State;
 
+        // Hide the whole object once the passenger boards the taxi — they are
+        // no longer standing at their origin, so the prefab should disappear.
+        bool onStreet = _lastState == PedestrianState.Waiting
+                     || _lastState == PedestrianState.Matched;
+        gameObject.SetActive(onStreet);
+        if (!onStreet) return;
+
         SetActive(WaitingIndicator, _lastState == PedestrianState.Waiting);
         SetActive(MatchedIndicator, _lastState == PedestrianState.Matched);
-        SetActive(RidingIndicator,  _lastState == PedestrianState.Riding);
     }
 
     static void SetActive(GameObject go, bool active)

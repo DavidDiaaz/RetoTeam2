@@ -32,6 +32,7 @@ public class SimulationManager : MonoBehaviour
     // ---------------------------------------------------------------
 
     World world;
+    public World World => world;
 
     List<Lane>        _spawnableLanes = new();
     List<TrafficNode> _roadNodes      = new();
@@ -59,12 +60,16 @@ public class SimulationManager : MonoBehaviour
             _edgeToSegment[edge] = seg;
             if (edge.IsConnector) continue;
 
+            // Skip dead-end segments — their lanes lead nowhere and cause cascade jams.
+            // Dead-end = the edge's end node has no outgoing connections (terminal node).
+            if (IsDeadEnd(edge)) continue;
+
             foreach (var lane in edge.Lanes)
                 _spawnableLanes.Add(lane);
 
-            if (edge.from != null && !_roadNodes.Contains(edge.from))
-                _roadNodes.Add(edge.from);
-            if (edge.to != null && !_roadNodes.Contains(edge.to))
+            // Only use edge.to nodes that have outgoing connections for pedestrian placement.
+            // Terminal nodes cause taxis to go there and get stuck.
+            if (edge.to != null && edge.to.Outgoing.Count > 0 && !_roadNodes.Contains(edge.to))
                 _roadNodes.Add(edge.to);
         }
 
@@ -217,7 +222,8 @@ public class SimulationManager : MonoBehaviour
 
         var p = new Pedestrian(origin, dest, pedestrianTolerance, worldPos);
         world.AddPedestrian(p);
-        worldView.SpawnPedestrian(p);
+        var pedGO = worldView.SpawnPedestrianAndReturn(p);
+        if (pedGO != null) followCam?.RegisterPedestrian(p, pedGO);
         _trackedPedestrians.Add(p);
         _activePedestrians++;
     }
@@ -235,6 +241,7 @@ public class SimulationManager : MonoBehaviour
         foreach (var p in toRemove)
         {
             _trackedPedestrians.Remove(p);
+            followCam?.UnregisterPedestrian(p);
             worldView.DestroyPedestrian(p);
             _activePedestrians = Mathf.Max(0, _activePedestrians - 1);
         }
@@ -243,6 +250,10 @@ public class SimulationManager : MonoBehaviour
     // ---------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------
+
+    /// <summary>True if the edge ends at a terminal node (no outgoing edges).</summary>
+    static bool IsDeadEnd(TrafficEdge edge) =>
+        edge != null && !edge.IsConnector && edge.to != null && edge.to.Outgoing.Count == 0;
 
     RoadSegment FindSegmentForEdge(TrafficEdge edge)
     {

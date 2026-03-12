@@ -65,6 +65,9 @@ public abstract class VehicleAgent : Agent
     float _waitTime = 0f;
     float _logTimer = 0f;
     const float STUCK_THRESHOLD    = 5f;
+
+    /// <summary>True when the car has been blocked at an edge transition for >= STUCK_THRESHOLD seconds.</summary>
+    protected bool IsStuck => _waitTime >= STUCK_THRESHOLD;
     const float LOG_INTERVAL       = 3f;
     const float LANE_CHANGE_METERS = 15f;
 
@@ -189,7 +192,8 @@ public abstract class VehicleAgent : Agent
 
         // 3. Sibling connector conflict — another connector feeding the same
         //    dest lane at the same merge point already has a car in it.
-        //    Only one connector may be active at a time per merge point.
+        //    Use vehicle ID as a tiebreaker so two connectors don't deadlock
+        //    each other (lower ID = higher priority = gets to go first).
         foreach (var sibling in destLane.IncomingConnectors)
         {
             if (sibling == connLane) continue;           // skip self
@@ -201,7 +205,13 @@ public abstract class VehicleAgent : Agent
             float siblingMerge = siblingLinks[0].MergePosition * destLane.Edge.Length;
 
             // Consider it a conflict if merge positions are within one car-length
-            if (Math.Abs(siblingMerge - mergePos) < Length * 1.5f)
+            if (Math.Abs(siblingMerge - mergePos) >= Length * 1.5f) continue;
+
+            // Only yield to a sibling whose leading car is still moving.
+            // If the sibling is also stuck, lower ID wins to break the deadlock.
+            var siblingFront = sibling.Vehicles[sibling.Vehicles.Count - 1];
+            bool siblingMoving = siblingFront.Speed > 0.5f;
+            if (siblingMoving || siblingFront.Id < Id)
                 return brakeTo;
         }
 
@@ -331,11 +341,31 @@ public abstract class VehicleAgent : Agent
 
         if (destLane.Edge.IsConnector)
         {
-            // Hard gate: connector entry zone must be clear
-            float connLen = destLane.Edge.Length;
-            foreach (var v in destLane.Vehicles)
+            // Hard gate: connector entry zone must be clear.
+            // Bypassed when stuck too long to break circular deadlocks.
+            if (!IsStuck)
             {
-                if (v.Position < connLen * 0.6f)
+                float connLen = destLane.Edge.Length;
+                foreach (var v in destLane.Vehicles)
+                {
+                    if (v.Position < connLen * 0.6f)
+                    {
+                        Speed      = 0;
+                        Position   = CurrentLane.Edge.Length - 0.05f;
+                        _waitTime += dt;
+                        if (_waitTime >= STUCK_THRESHOLD) LogStuck();
+                        return;
+                    }
+                }
+            }
+        }
+        else
+        {
+            // Exiting connector onto real lane.
+            // Bypassed when stuck too long to break circular deadlocks.
+            if (!IsStuck)
+            {
+                if (!destLane.IsSegmentFree(mergePos, Length))
                 {
                     Speed      = 0;
                     Position   = CurrentLane.Edge.Length - 0.05f;
@@ -343,31 +373,19 @@ public abstract class VehicleAgent : Agent
                     if (_waitTime >= STUCK_THRESHOLD) LogStuck();
                     return;
                 }
-            }
-        }
-        else
-        {
-            // Exiting connector onto real lane
-            if (!destLane.IsSegmentFree(mergePos, Length))
-            {
-                Speed      = 0;
-                Position   = CurrentLane.Edge.Length - 0.05f;
-                _waitTime += dt;
-                if (_waitTime >= STUCK_THRESHOLD) LogStuck();
-                return;
-            }
 
-            var aheadInDest = destLane.GetVehicleAheadAt(mergePos + Length);
-            if (aheadInDest != null)
-            {
-                float gap         = aheadInDest.Position - aheadInDest.Length - mergePos;
-                float brakingDist = (Speed * Speed) / (2f * 4f);
-                if (gap < brakingDist)
+                var aheadInDest = destLane.GetVehicleAheadAt(mergePos + Length);
+                if (aheadInDest != null)
                 {
-                    Speed      = 0;
-                    Position   = CurrentLane.Edge.Length - 0.05f;
-                    _waitTime += dt;
-                    return;
+                    float gap         = aheadInDest.Position - aheadInDest.Length - mergePos;
+                    float brakingDist = (Speed * Speed) / (2f * 4f);
+                    if (gap < brakingDist)
+                    {
+                        Speed      = 0;
+                        Position   = CurrentLane.Edge.Length - 0.05f;
+                        _waitTime += dt;
+                        return;
+                    }
                 }
             }
         }

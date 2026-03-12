@@ -7,6 +7,9 @@ public class FleetManager : Agent
     List<AutonomousTaxi> _taxis   = new();
     HashSet<Pedestrian>  _pending = new();
 
+    public IReadOnlyList<AutonomousTaxi>    Taxis   => _taxis;
+    public IReadOnlyCollection<Pedestrian>  Pending => _pending;
+
     public FleetManager(NavigationGraph graph) { _graph = graph; }
 
     public void RegisterTaxi(AutonomousTaxi taxi)
@@ -37,23 +40,51 @@ public class FleetManager : Agent
             var taxi = FindNearestIdleTaxi(p.CurrentNode);
             if (taxi == null) continue;
 
-            var path = BuildFullLinkPath(taxi.CurrentNode, taxi.CurrentLane,
-                                         p.CurrentNode, p.Destination);
+            var (taxiNode, taxiLane) = GetEffectiveTaxiPos(taxi);
+            if (taxiNode == null || taxiLane == null) continue;
+
+            var (path, leg2Count) = BuildFullLinkPath(taxiNode, taxiLane,
+                                                      p.CurrentNode, p.Destination);
             if (path == null)
             {
+                // Don't cancel — retry next tick. The pedestrian's tolerance timer
+                // will cancel them if they remain unservable for too long.
                 Debug.LogWarning(
                     $"[FleetManager] No path for pedestrian at node {p.CurrentNode?.id} " +
-                    $"→ {p.Destination?.id}. Cancelling.");
-                p.State = PedestrianState.Cancelled;
+                    $"→ {p.Destination?.id}. Will retry.");
                 continue;
             }
 
-            taxi.AssignPath(path, p);
+            taxi.AssignPath(path, p, leg2Count);
             p.OnMatched();
         }
     }
 
     public override void Act(World world) { }
+
+    // ---------------------------------------------------------------
+    // Returns the real (non-connector) node and lane the taxi is on or
+    // about to enter. If the taxi is mid-connector, we use the connector's
+    // destination real lane so the pathfinder works with real-graph nodes.
+    // ---------------------------------------------------------------
+    (TrafficNode node, Lane lane) GetEffectiveTaxiPos(AutonomousTaxi taxi)
+    {
+        var lane = taxi.CurrentLane;
+        if (lane == null) return (null, null);
+
+        if (lane.Edge.IsConnector)
+        {
+            var links = _graph.GetLinksFrom(lane);
+            if (links.Count > 0)
+            {
+                var realLane = links[0].DestLane;
+                return (realLane.Edge.from, realLane);
+            }
+            return (null, null);
+        }
+
+        return (lane.Edge.from, lane);
+    }
 
     // ---------------------------------------------------------------
     // Find nearest idle taxi by road distance (connector edges ignored)
@@ -66,7 +97,10 @@ public class FleetManager : Agent
         foreach (var taxi in _taxis)
         {
             if (!taxi.IsAvailable) continue;
-            var edgePath = Pathfinder.FindPath(_graph, taxi.CurrentNode, targetNode);
+            var (taxiNode, _) = GetEffectiveTaxiPos(taxi);
+            if (taxiNode == null) continue;
+
+            var edgePath = Pathfinder.FindPath(_graph, taxiNode, targetNode);
             if (edgePath == null) continue;
 
             float dist = 0f;
@@ -81,74 +115,75 @@ public class FleetManager : Agent
 
     // ---------------------------------------------------------------
     // Build a LaneLink queue for the full trip: taxi → pickup → dropoff.
-    //
-    // CONNECTOR AWARENESS:
-    // After the connector-lane refactor every lane transition goes:
-    //   realLane → [ToConnector link] → connectorLane → [FromConnector link] → realLane
-    //
-    // Dijkstra returns a raw edge list that may include connector edges.
-    // We strip connectors from that list to get only real-road waypoints,
-    // then for each consecutive pair (currentEdge → nextRealEdge) we find
-    // the two-hop link chain: currentLane → connectorLane → lane on nextRealEdge.
+    // Returns the queue AND the number of leg-2 links (pickup→destination)
+    // so the taxi can compute per-leg distance for the UI.
     // ---------------------------------------------------------------
-    Queue<LaneLink> BuildFullLinkPath(
-        TrafficNode taxiNode,      Lane       taxiLane,
+    (Queue<LaneLink>, int) BuildFullLinkPath(
+        TrafficNode taxiNode,      Lane        taxiLane,
         TrafficNode passengerNode, TrafficNode destinationNode)
     {
         var edgePath1 = Pathfinder.FindPath(_graph, taxiNode,      passengerNode);
         var edgePath2 = Pathfinder.FindPath(_graph, passengerNode, destinationNode);
-        if (edgePath1 == null || edgePath2 == null) return null;
+        if (edgePath1 == null || edgePath2 == null) return (null, 0);
 
-        // Build a list of REAL road edges only — connectors are resolved implicitly
-        var realEdges = new List<TrafficEdge>();
-        foreach (var e in edgePath1) if (!e.IsConnector) realEdges.Add(e);
-        foreach (var e in edgePath2) if (!e.IsConnector) realEdges.Add(e);
+        var realEdges1 = new List<TrafficEdge>();
+        foreach (var e in edgePath1) if (!e.IsConnector) realEdges1.Add(e);
 
-        if (realEdges.Count == 0) return new Queue<LaneLink>();
+        var realEdges2 = new List<TrafficEdge>();
+        foreach (var e in edgePath2) if (!e.IsConnector) realEdges2.Add(e);
 
         var  result      = new Queue<LaneLink>();
         Lane currentLane = taxiLane;
 
-        foreach (var nextRealEdge in realEdges)
+        // ── Leg 1: taxi → pickup ──────────────────────────────────────
+        foreach (var nextRealEdge in realEdges1)
         {
-            // Already sitting on this edge (taxi starts here, or pickup == dropoff edge)
             if (currentLane.Edge == nextRealEdge) continue;
 
             var chain = FindLinkChainToEdge(currentLane, nextRealEdge);
             if (chain == null)
             {
                 Debug.LogWarning(
-                    $"[FleetManager] No link chain from " +
-                    $"edge({currentLane.Edge.from.id}→{currentLane.Edge.to.id}) " +
+                    $"[FleetManager] No link chain (leg1) " +
+                    $"from edge({currentLane.Edge.from.id}→{currentLane.Edge.to.id}) " +
                     $"to edge({nextRealEdge.from.id}→{nextRealEdge.to.id})");
-                return null;
+                return (null, 0);
             }
 
-            foreach (var link in chain)
-                result.Enqueue(link);
-
+            foreach (var link in chain) result.Enqueue(link);
             currentLane = chain[chain.Count - 1].DestLane;
         }
 
-        return result;
+        // ── Leg 2: pickup → destination ───────────────────────────────
+        int leg2Count = 0;
+        foreach (var nextRealEdge in realEdges2)
+        {
+            if (currentLane.Edge == nextRealEdge) continue;
+
+            var chain = FindLinkChainToEdge(currentLane, nextRealEdge);
+            if (chain == null)
+            {
+                Debug.LogWarning(
+                    $"[FleetManager] No link chain (leg2) " +
+                    $"from edge({currentLane.Edge.from.id}→{currentLane.Edge.to.id}) " +
+                    $"to edge({nextRealEdge.from.id}→{nextRealEdge.to.id})");
+                return (null, 0);
+            }
+
+            foreach (var link in chain) result.Enqueue(link);
+            leg2Count += chain.Count;
+            currentLane = chain[chain.Count - 1].DestLane;
+        }
+
+        return (result, leg2Count);
     }
 
     // ---------------------------------------------------------------
     // Return the LaneLink sequence that moves currentLane to a lane on
     // targetEdge, hopping through exactly one connector layer.
-    //
-    //   Case A — direct link (pre-refactor fallback, kept for safety):
-    //     currentLane --link--> lane on targetEdge
-    //
-    //   Case B — normal post-refactor path:
-    //     currentLane --toConnLink--> connectorLane --fromConnLink--> lane on targetEdge
-    //
-    //   Both cases also try sibling lanes on the same edge when the taxi
-    //   happens to be in a lane that doesn't have a direct exit.
     // ---------------------------------------------------------------
     List<LaneLink> FindLinkChainToEdge(Lane currentLane, TrafficEdge targetEdge)
     {
-        // Try current lane first, then siblings
         foreach (var candidate in CandidateLanes(currentLane))
         {
             var links = _graph.GetLinksFrom(candidate);
@@ -173,8 +208,6 @@ public class FleetManager : Agent
         return null;
     }
 
-    // Current lane first, then all siblings on the same edge, favouring
-    // same lane number to keep the taxi in a predictable lane.
     IEnumerable<Lane> CandidateLanes(Lane lane)
     {
         yield return lane;
@@ -182,8 +215,6 @@ public class FleetManager : Agent
         foreach (var sibling in lane.Edge.Lanes)
         {
             if (sibling == lane) continue;
-            // Same lane number on a different edge shouldn't appear here,
-            // but guard anyway.
             yield return sibling;
         }
     }

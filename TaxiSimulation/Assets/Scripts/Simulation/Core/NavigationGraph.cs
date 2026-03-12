@@ -9,8 +9,6 @@ public class NavigationGraph
     // Index for fast lookup: given a lane, what links lead out of it?
     Dictionary<Lane, List<LaneLink>> _linksFrom = new();
 
-    int _nextNodeId = 10000; // synthetic node IDs start high to avoid collisions
-
     public void AddNode(TrafficNode node) => nodes[node.id] = node;
 
     public TrafficEdge AddEdge(
@@ -83,11 +81,12 @@ public class NavigationGraph
         float worldDist  = Vector3.Distance(sourceLaneEndWorld, destLaneStartWorld);
         float logicalLen = Mathf.Max(worldDist * metersPerUnit, 0.5f); // floor: 0.5 m
 
-        // Synthetic nodes
-        var nodeA = new TrafficNode(_nextNodeId++) { Label = "conn_a" };
-        var nodeB = new TrafficNode(_nextNodeId++) { Label = "conn_b" };
-        nodes[nodeA.id] = nodeA;
-        nodes[nodeB.id] = nodeB;
+        // Reuse the REAL road nodes as connector endpoints so that Dijkstra
+        // (which operates on the node graph) can traverse across segments.
+        // sourceLane.Edge.to  = end of source segment
+        // destLane.Edge.from  = start of destination segment
+        var nodeA = sourceLane.Edge.to;
+        var nodeB = destLane.Edge.from;
 
         // Connector edge — single lane, connector flag set
         int connSpeed = speedLimit > 0
@@ -105,7 +104,7 @@ public class NavigationGraph
         };
         var connLane = new Lane { Edge = connEdge, LaneNumber = 0 };
         connEdge.Lanes.Add(connLane);
-        nodeA.Outgoing.Add(connEdge);
+        nodeA.Outgoing.Add(connEdge); // KEY: Dijkstra can now cross to the next segment
 
         // Link A: sourceLane → connectorLane (always enters at start)
         AddLaneLink(sourceLane, connLane, mergePosition: 0f);
