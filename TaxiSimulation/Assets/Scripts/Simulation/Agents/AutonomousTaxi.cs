@@ -6,6 +6,8 @@ public enum TaxiState { Idle, EnRouteToPickup, Carrying }
 /// <summary>
 /// Path-following taxi. Follows a pre-computed sequence of LaneLinks
 /// supplied by FleetManager. Picks up and drops off passengers.
+///
+/// Scale: 1 Unity unit = 3.5 m real-world. All distances in Unity units.
 /// </summary>
 public class AutonomousTaxi : VehicleAgent
 {
@@ -15,15 +17,13 @@ public class AutonomousTaxi : VehicleAgent
     TrafficNode dropoffNode;
 
     // Passenger assigned (en route to pick up) but not yet boarded.
-    // Kept separate from Passenger so State = EnRouteToPickup, not Carrying.
     Pedestrian _assignedPassenger;
 
     // Number of path links in leg 2 (pickup→destination).
-    // Used to show per-leg distance: leg1 remaining = path.Count - _leg2LinkCount.
     int _leg2LinkCount;
 
     float desiredSpeed;
-    float acceleration = 4f;
+    float acceleration = 1.14f;   // 4 m/s² / 3.5
 
     // ---------------------------------------------------------------
     public Pedestrian Passenger    { get; private set; }
@@ -43,22 +43,15 @@ public class AutonomousTaxi : VehicleAgent
     public TrafficNode CurrentNode => CurrentLane?.Edge.from;
 
     /// <summary>
-    /// Approximate remaining path distance in logical metres.
+    /// Approximate remaining path distance in logical units.
     /// Skips connector contribution to avoid brief increases at intersections.
     /// </summary>
     public float EstimatedDistanceRemaining
     {
         get
         {
-            // Skip connector distance only when Carrying (short connectors inflate the
-            // reading). When EnRouteToPickup, the final connector IS the last hop to
-            // the passenger, so include its remaining distance to avoid showing < 10m
-            // while still a few meters away.
             float d = (OnConnector && State == TaxiState.Carrying) ? 0f : DistanceToEdgeEnd;
 
-            // EnRouteToPickup: only count leg-1 links (path.Count - _leg2LinkCount).
-            // Carrying: count all remaining links (they are all leg-2).
-            // This ensures the display reaches ~0 at pickup, then resets to destination distance.
             int limit = (State == TaxiState.EnRouteToPickup)
                 ? System.Math.Max(0, path.Count - _leg2LinkCount)
                 : int.MaxValue;
@@ -81,8 +74,6 @@ public class AutonomousTaxi : VehicleAgent
         path.Clear();
         foreach (var l in links) path.Enqueue(l);
 
-        // Do NOT set Passenger here — the taxi hasn't boarded anyone yet.
-        // Passenger is set in CheckPassengerEvents when the taxi reaches pickupNode.
         Passenger          = null;
         _assignedPassenger = passenger;
         pickupNode         = passenger.CurrentNode;
@@ -121,7 +112,8 @@ public class AutonomousTaxi : VehicleAgent
         if (TargetNode == null) return;
 
         // Pickup: taxi has arrived at the passenger's node
-        if (pickupNode != null && TargetNode == pickupNode && DistanceToEdgeEnd <= 1f)
+        // 1m / 3.5 ≈ 0.29 units
+        if (pickupNode != null && TargetNode == pickupNode && DistanceToEdgeEnd <= 0.29f)
         {
             _assignedPassenger?.OnPickedUp();
             Passenger          = _assignedPassenger;
@@ -130,7 +122,7 @@ public class AutonomousTaxi : VehicleAgent
         }
 
         // Dropoff: taxi has arrived at the destination node
-        if (dropoffNode != null && TargetNode == dropoffNode && DistanceToEdgeEnd <= 1f)
+        if (dropoffNode != null && TargetNode == dropoffNode && DistanceToEdgeEnd <= 0.29f)
         {
             Passenger?.OnDroppedOff();
             Passenger   = null;
@@ -240,9 +232,10 @@ public class AutonomousTaxi : VehicleAgent
         float speedLimit = TrafficLaw.SpeedLimitMs(this);
         desiredSpeed     = speedLimit;
 
-        if (GapAhead < 15f && AheadOnLane != null)
+        // Car-following lookahead: 15m / 3.5 ≈ 4.3 units
+        if (GapAhead < 4.3f && AheadOnLane != null)
         {
-            float f  = Math.Max(0f, GapAhead / 15f);
+            float f  = Math.Max(0f, GapAhead / 4.3f);
             desiredSpeed = Math.Min(desiredSpeed, AheadOnLane.Speed * f);
         }
 
