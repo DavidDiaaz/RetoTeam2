@@ -55,12 +55,48 @@ public class AmbientDriver : VehicleAgent
 
         var candidates = direct.Count > 0 ? direct : links;
 
-        // Prefer links that don't lead to dead-end segments.
-        // Dead-end = the destination lane's edge ends at a terminal node (no outgoing).
+        // Evitar calles sin salida (Terminal nodes)
         var nonDeadEnd = candidates.FindAll(l => !IsDeadEndLink(l, graph));
         if (nonDeadEnd.Count > 0) candidates = nonDeadEnd;
 
-        return candidates[rng.Next(candidates.Count)];
+        // --- SISTEMA DE RULETA (Weighted Random Selection) ---
+        float totalWeight = 0f;
+        float[] weights = new float[candidates.Count];
+
+        for (int i = 0; i < candidates.Count; i++)
+        {
+            LaneLink link = candidates[i];
+            float weight = 10f; // Peso base (todas las opciones tienen chance)
+
+            // 1. Preferencia por seguir recto (fluidez natural)
+            if (link.IsStraight) 
+                weight += 20f; 
+
+            // 2. Repulsión suave al tráfico
+            // Si el perímetro se llena, las calles hacia el centro se vuelven más atractivas
+            int trafficCount = link.DestLane.Vehicles.Count;
+            weight -= trafficCount * 1.5f;
+
+            // Nunca permitimos pesos negativos o cero absoluto
+            // Siempre hay al menos 1 boleto de lotería para cada giro posible
+            weight = Math.Max(1f, weight);
+
+            weights[i] = weight;
+            totalWeight += weight;
+        }
+
+        // Hacemos girar la ruleta (Tirar el dado)
+        float roll = (float)rng.NextDouble() * totalWeight;
+        float cursor = 0f;
+
+        for (int i = 0; i < candidates.Count; i++)
+        {
+            cursor += weights[i];
+            if (roll <= cursor)
+                return candidates[i]; // ¡Calle seleccionada!
+        }
+
+        return candidates[0]; // Fallback de seguridad
     }
 
     // ---------------------------------------------------------------
