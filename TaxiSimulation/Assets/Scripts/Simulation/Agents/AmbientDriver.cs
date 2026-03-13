@@ -69,8 +69,8 @@ public class AmbientDriver : VehicleAgent
             float weight = 10f; // Peso base (todas las opciones tienen chance)
 
             // 1. Preferencia por seguir recto (fluidez natural)
-            if (link.IsStraight) 
-                weight += 20f; 
+            if (link.IsStraight)
+                weight += 5f;
 
             // 2. Repulsión suave al tráfico
             // Si el perímetro se llena, las calles hacia el centro se vuelven más atractivas
