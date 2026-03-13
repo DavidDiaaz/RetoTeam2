@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 0b1be03663e065b4aacccd92d2fdea2b
+timeCreated: 1517459930
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 107224
+  packageName: CITY package
+  packageVersion: 1.0
+  assetPath: Assets/POLYGON city pack/Prefabs/Props/Bin prefab.prefab
+  uploadId: 658773

@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 4e4fd46b1a4b3c547b0f473a85a3b29d
+timeCreated: 1517504630
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 107224
+  packageName: CITY package
+  packageVersion: 1.0
+  assetPath: Assets/POLYGON city pack/Prefabs/Props/mayonnaise prefab.prefab
+  uploadId: 658773

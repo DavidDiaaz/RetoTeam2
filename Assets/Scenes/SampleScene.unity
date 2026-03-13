@@ -4847,11 +4847,6 @@ Transform:
   - {fileID: 2091475594}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!4 &194824557 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 4070866951429214806, guid: 6c28e88db890a6f4aa5477e0eee5fcd3, type: 3}
-  m_PrefabInstance: {fileID: 512087406}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &199722276
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -5222,6 +5217,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 48918792fc1886442909aba00e6b3865, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FlashAutoRouteFromGrid
+  routeJson: {fileID: 0}
+  origin: {fileID: 0}
+  cellSize: 1
+  rowIncreasesToWorldZ: 1
+  yOffset: 0
+  speed: 12
+  arriveDistance: 0.15
+  loop: 1
+  teleportBetweenSegments: 1
 --- !u!1001 &222835366
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -7833,11 +7837,27 @@ MonoBehaviour:
   m_GameObject: {fileID: 330585543}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2e43075ff1731d84dac3e5b7f76fe330, type: 3}
+  m_Script: {fileID: 11500000, guid: c8d722f21be5e469c9f7971d15d157ef, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CameraFollowController
-  followOffset: {x: 0, y: 6, z: -10}
-  followSpeed: 5
+  followDistance: 8
+  followHeight: 3
+  followSmoothing: 6
+  freeCamSpeed: 10
+  freeCamFastMult: 3
+  freeCamSensitivity: 3
+  fadeDuration: 0.4
+  hudGroup: {fileID: 0}
+  blackoutGroup: {fileID: 0}
+  labelText: {fileID: 0}
+  filterLabel: {fileID: 0}
+  filterButton: {fileID: 0}
+  prevButton: {fileID: 0}
+  nextButton: {fileID: 0}
+  freeCamButton: {fileID: 0}
+  freeCamLabel: {fileID: 0}
+  taxiStatusText: {fileID: 0}
+  taxiStatusPanel: {fileID: 0}
 --- !u!1 &333720472
 GameObject:
   m_ObjectHideFlags: 0
@@ -18802,6 +18822,11 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 4224860659773492, guid: 2da3775d316a3e04da01b3c659ee96db, type: 3}
   m_PrefabInstance: {fileID: 891081866}
   m_PrefabAsset: {fileID: 0}
+--- !u!4 &894628295 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 4918264445696955943, guid: 6c28e88db890a6f4aa5477e0eee5fcd3, type: 3}
+  m_PrefabInstance: {fileID: 512087406}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &898029641 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 8199043090807676854, guid: 0133fbdcbc98a0946a5400393264b36a, type: 3}
@@ -25837,7 +25862,7 @@ Transform:
   - {fileID: 62476902}
   - {fileID: 1834034129}
   - {fileID: 1808283396}
-  - {fileID: 194824557}
+  - {fileID: 894628295}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!64 &1206106697

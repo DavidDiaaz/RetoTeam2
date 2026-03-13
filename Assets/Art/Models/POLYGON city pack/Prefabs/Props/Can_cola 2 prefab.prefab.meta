@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: ce3c616ef3fcb964aa16010b3a0e9ba7
+timeCreated: 1517460852
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 107224
+  packageName: CITY package
+  packageVersion: 1.0
+  assetPath: Assets/POLYGON city pack/Prefabs/Props/Can_cola 2 prefab.prefab
+  uploadId: 658773

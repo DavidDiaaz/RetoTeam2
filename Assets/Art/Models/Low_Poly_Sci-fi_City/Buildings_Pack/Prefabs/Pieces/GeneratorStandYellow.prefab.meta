@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: fb610c4c6576cfe4bb101e803c6fef0c
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 242670
+  packageName: Sci-Fi Cyberpunk City Environment with Road System and Skyscrapers
+    - Cityscape
+  packageVersion: 1.0.0
+  assetPath: Assets/Low_Poly_Sci-fi_City/Buildings_Pack/Prefabs/Pieces/GeneratorStandYellow.prefab
+  uploadId: 680759

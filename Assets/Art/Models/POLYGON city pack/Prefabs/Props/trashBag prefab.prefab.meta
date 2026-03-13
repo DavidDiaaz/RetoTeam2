@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: f438d59f6e097524a99f8e05a307aae0
+timeCreated: 1517527345
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 107224
+  packageName: CITY package
+  packageVersion: 1.0
+  assetPath: Assets/POLYGON city pack/Prefabs/Props/trashBag prefab.prefab
+  uploadId: 658773

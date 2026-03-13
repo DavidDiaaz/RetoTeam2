@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: d40f9b65c22a28c48a4dce51b3c7bb9d
+timeCreated: 1517702316
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 107224
+  packageName: CITY package
+  packageVersion: 1.0
+  assetPath: Assets/POLYGON city pack/Meshes,textures/props_FBX/Materials/light 2
+    b.mat
+  uploadId: 658773

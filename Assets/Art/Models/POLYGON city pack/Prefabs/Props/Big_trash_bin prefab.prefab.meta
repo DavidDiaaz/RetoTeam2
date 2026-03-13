@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 574bc0b6281c95745ad8ac1e406ef269
+timeCreated: 1517459868
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 107224
+  packageName: CITY package
+  packageVersion: 1.0
+  assetPath: Assets/POLYGON city pack/Prefabs/Props/Big_trash_bin prefab.prefab
+  uploadId: 658773

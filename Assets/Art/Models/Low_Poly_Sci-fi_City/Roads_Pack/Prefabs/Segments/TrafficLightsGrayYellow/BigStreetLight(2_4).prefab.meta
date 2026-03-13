@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 6b414a160d53d8542bb7de76108af124
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 242670
+  packageName: Sci-Fi Cyberpunk City Environment with Road System and Skyscrapers
+    - Cityscape
+  packageVersion: 1.0.0
+  assetPath: Assets/Low_Poly_Sci-fi_City/Roads_Pack/Prefabs/Segments/TrafficLightsGrayYellow/BigStreetLight(2_4).prefab
+  uploadId: 680759

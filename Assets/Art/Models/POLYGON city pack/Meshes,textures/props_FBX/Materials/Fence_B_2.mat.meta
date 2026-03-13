@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: e187681a41d681047abbb62a29acce64
+timeCreated: 1520410832
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 107224
+  packageName: CITY package
+  packageVersion: 1.0
+  assetPath: Assets/POLYGON city pack/Meshes,textures/props_FBX/Materials/Fence_B_2.mat
+  uploadId: 658773

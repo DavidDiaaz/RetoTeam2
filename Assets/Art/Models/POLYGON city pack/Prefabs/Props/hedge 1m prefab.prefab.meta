@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: f8ce7d5305b1047439d71005336e5bde
+timeCreated: 1517503370
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 107224
+  packageName: CITY package
+  packageVersion: 1.0
+  assetPath: Assets/POLYGON city pack/Prefabs/Props/hedge 1m prefab.prefab
+  uploadId: 658773

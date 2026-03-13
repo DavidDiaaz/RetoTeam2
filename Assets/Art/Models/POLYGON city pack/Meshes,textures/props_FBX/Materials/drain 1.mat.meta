@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 7f8fb14c5909a73458f153886f13e1be
+timeCreated: 1520410819
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 107224
+  packageName: CITY package
+  packageVersion: 1.0
+  assetPath: Assets/POLYGON city pack/Meshes,textures/props_FBX/Materials/drain 1.mat
+  uploadId: 658773

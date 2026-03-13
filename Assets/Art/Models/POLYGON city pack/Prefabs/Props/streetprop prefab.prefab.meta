@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 4fcdd8e5b7ec2a648af521bb4c0e8af5
+timeCreated: 1517519467
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 107224
+  packageName: CITY package
+  packageVersion: 1.0
+  assetPath: Assets/POLYGON city pack/Prefabs/Props/streetprop prefab.prefab
+  uploadId: 658773

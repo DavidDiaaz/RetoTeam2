@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: c9da6fffd233b95409240b7e1b1dc1be
+timeCreated: 1517501953
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 107224
+  packageName: CITY package
+  packageVersion: 1.0
+  assetPath: Assets/POLYGON city pack/Prefabs/Props/Fence_B_1 prefab.prefab
+  uploadId: 658773

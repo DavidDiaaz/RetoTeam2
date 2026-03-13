@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 685132d88744b2743a16956f37277309
+timeCreated: 1517503024
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 107224
+  packageName: CITY package
+  packageVersion: 1.0
+  assetPath: Assets/POLYGON city pack/Prefabs/Props/GlassCola prefab.prefab
+  uploadId: 658773

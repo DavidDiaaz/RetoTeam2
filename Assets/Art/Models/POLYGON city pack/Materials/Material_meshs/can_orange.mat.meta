@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 008f2b96cc7005248989c813c361a76c
+timeCreated: 1517460776
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 107224
+  packageName: CITY package
+  packageVersion: 1.0
+  assetPath: Assets/POLYGON city pack/Materials/Material_meshs/can_orange.mat
+  uploadId: 658773

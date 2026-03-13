@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: cf34a2f4172f3d4499b4570e42ec224f
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 242670
+  packageName: Sci-Fi Cyberpunk City Environment with Road System and Skyscrapers
+    - Cityscape
+  packageVersion: 1.0.0
+  assetPath: Assets/Low_Poly_Sci-fi_City/Roads_Pack/Prefabs/Segments/BridgeSupportGrayYellow/SupportBridge(10x14).prefab
+  uploadId: 680759

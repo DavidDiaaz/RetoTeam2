@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 8b57e18affa7e7d4faf35e9ae2bc71ff
+timeCreated: 1520410832
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 107224
+  packageName: CITY package
+  packageVersion: 1.0
+  assetPath: Assets/POLYGON city pack/Meshes,textures/props_FBX/Materials/texture.mat
+  uploadId: 658773
