@@ -8,8 +8,9 @@ public class VehicleView : MonoBehaviour
     // Keep the last rendered world position so we can smooth out one-tick
     // connector traversals (car enters and exits a short connector in the
     // same simulation tick — the view never sees the intermediate state).
-    Vector3 _lastPos;
-    bool    _hasPrev;
+    Vector3    _lastPos;
+    bool       _hasPrev;
+    Quaternion _rotation = Quaternion.identity;
 
     // When a lane change completes, hold the blended position for one frame
     // so there is no snap on the tick CurrentLane switches to the dest lane.
@@ -78,7 +79,7 @@ public class VehicleView : MonoBehaviour
                 // If the jump is large relative to the speed, smooth it.
                 if (_hasPrev)
                 {
-                    float maxJump = Mathf.Max(Agent.Speed * Time.deltaTime * 4f, 1f);
+                    float maxJump = Mathf.Max(Agent.Speed * Time.deltaTime * 2f, 0.5f);
                     if (Vector3.Distance(_lastPos, finalPos) > maxJump)
                         finalPos = Vector3.MoveTowards(_lastPos, finalPos, maxJump);
                 }
@@ -90,6 +91,10 @@ public class VehicleView : MonoBehaviour
 
         transform.position = finalPos;
         if (tangent.sqrMagnitude > 0.001f)
-            transform.rotation = Quaternion.LookRotation(tangent, Vector3.up);
+        {
+            Quaternion targetRot = Quaternion.LookRotation(tangent, Vector3.up);
+            _rotation = Quaternion.Slerp(_rotation, targetRot, Time.deltaTime * 8f);
+            transform.rotation = _rotation;
+        }
     }
 }

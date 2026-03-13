@@ -47,8 +47,20 @@ public class LaneView
         float worldDist = WorldLength * Mathf.Clamp01(logicalPosition / edgeLength);
 
         for (int i = 0; i < CumulativeDistances.Length - 1; i++)
+        {
             if (worldDist <= CumulativeDistances[i + 1])
-                return (Waypoints[i + 1] - Waypoints[i]).normalized;
+            {
+                Vector3 currDir = (Waypoints[i + 1] - Waypoints[i]).normalized;
+                if (i + 2 < Waypoints.Length)
+                {
+                    Vector3 nextDir    = (Waypoints[i + 2] - Waypoints[i + 1]).normalized;
+                    float   distToKnot = CumulativeDistances[i + 1] - worldDist;
+                    float   t          = Mathf.Clamp01(1f - distToKnot / 0.5f);
+                    return Vector3.Slerp(currDir, nextDir, t).normalized;
+                }
+                return currDir;
+            }
+        }
 
         return (Waypoints[^1] - Waypoints[^2]).normalized;
     }
