@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 28258c59661dc914889585f84a2ee2f4
+timeCreated: 1517459780
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 107224
+  packageName: CITY package
+  packageVersion: 1.0
+  assetPath: Assets/POLYGON city pack/Prefabs/Props/Bench 2 prefab.prefab
+  uploadId: 658773

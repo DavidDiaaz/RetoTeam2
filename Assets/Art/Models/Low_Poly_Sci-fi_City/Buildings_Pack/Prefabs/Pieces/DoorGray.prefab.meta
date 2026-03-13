@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 870f023d6bbf94042a9e29bbe4add4aa
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 242670
+  packageName: Sci-Fi Cyberpunk City Environment with Road System and Skyscrapers
+    - Cityscape
+  packageVersion: 1.0.0
+  assetPath: Assets/Low_Poly_Sci-fi_City/Buildings_Pack/Prefabs/Pieces/DoorGray.prefab
+  uploadId: 680759

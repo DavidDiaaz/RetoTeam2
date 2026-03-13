@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: a0691b3b030957940aad207489863ab5
+timeCreated: 1517506315
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 107224
+  packageName: CITY package
+  packageVersion: 1.0
+  assetPath: Assets/POLYGON city pack/Prefabs/Props/platt sign 4 prefab.prefab
+  uploadId: 658773

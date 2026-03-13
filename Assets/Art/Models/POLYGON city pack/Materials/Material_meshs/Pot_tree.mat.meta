@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 00d89ec4048ecc14a8546c43dea1df1d
+timeCreated: 1517506444
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 107224
+  packageName: CITY package
+  packageVersion: 1.0
+  assetPath: Assets/POLYGON city pack/Materials/Material_meshs/Pot_tree.mat
+  uploadId: 658773

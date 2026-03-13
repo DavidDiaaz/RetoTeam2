@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: c48e457ccf08e264184a8e023a2d9731
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 242670
+  packageName: Sci-Fi Cyberpunk City Environment with Road System and Skyscrapers
+    - Cityscape
+  packageVersion: 1.0.0
+  assetPath: Assets/Low_Poly_Sci-fi_City/Buildings_Pack/Prefabs/Buildings/CandleYellowBuilding.prefab
+  uploadId: 680759

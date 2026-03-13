@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: d8eca12a3562ff34dba6fc7bc093eac3
+timeCreated: 1517519795
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 107224
+  packageName: CITY package
+  packageVersion: 1.0
+  assetPath: Assets/POLYGON city pack/Materials/Material_meshs/StreetSellerStand
+    AD.mat
+  uploadId: 658773

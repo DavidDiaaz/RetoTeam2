@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 0ab4f071579216049b5b6a607d3706bd
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 242670
+  packageName: Sci-Fi Cyberpunk City Environment with Road System and Skyscrapers
+    - Cityscape
+  packageVersion: 1.0.0
+  assetPath: Assets/Low_Poly_Sci-fi_City/Buildings_Pack/Prefabs/Buildings/CapsuleCyanBuilding_2.prefab
+  uploadId: 680759

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: a2c9ea9350336104fa4b5be1549bb5c7
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 242670
+  packageName: Sci-Fi Cyberpunk City Environment with Road System and Skyscrapers
+    - Cityscape
+  packageVersion: 1.0.0
+  assetPath: Assets/Low_Poly_Sci-fi_City/Roads_Pack/Prefabs/Road_with_StreetLights/TransitionsGrayYellow/2_4.prefab
+  uploadId: 680759

@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 696639aaeb4ba414f846e7d2e9a90eb7
+timeCreated: 1517503476
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 107224
+  packageName: CITY package
+  packageVersion: 1.0
+  assetPath: Assets/POLYGON city pack/Prefabs/Props/Hospital_sign prefab.prefab
+  uploadId: 658773

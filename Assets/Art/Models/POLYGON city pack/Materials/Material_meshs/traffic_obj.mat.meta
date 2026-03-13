@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: d1bbca11f7cda1c45ba66de904af413f
+timeCreated: 1517527004
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 107224
+  packageName: CITY package
+  packageVersion: 1.0
+  assetPath: Assets/POLYGON city pack/Materials/Material_meshs/traffic_obj.mat
+  uploadId: 658773

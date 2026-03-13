@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: a031f95212793a04eb477e9e6d9bb243
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 242670
+  packageName: Sci-Fi Cyberpunk City Environment with Road System and Skyscrapers
+    - Cityscape
+  packageVersion: 1.0.0
+  assetPath: Assets/Low_Poly_Sci-fi_City/Roads_Pack/Prefabs/Segments/BridgeSupportBlueRed/RoadSupport(13x18).prefab
+  uploadId: 680759

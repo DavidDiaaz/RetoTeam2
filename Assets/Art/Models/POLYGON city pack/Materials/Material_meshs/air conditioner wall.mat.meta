@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 6b431950ca5c853498b68f5f623421d5
+timeCreated: 1517459413
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 107224
+  packageName: CITY package
+  packageVersion: 1.0
+  assetPath: Assets/POLYGON city pack/Materials/Material_meshs/air conditioner wall.mat
+  uploadId: 658773

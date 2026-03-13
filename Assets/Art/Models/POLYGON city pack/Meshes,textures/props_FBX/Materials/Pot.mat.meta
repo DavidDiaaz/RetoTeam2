@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: e0d204c63c15bb847aa97eee3d058672
+timeCreated: 1520410821
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 107224
+  packageName: CITY package
+  packageVersion: 1.0
+  assetPath: Assets/POLYGON city pack/Meshes,textures/props_FBX/Materials/Pot.mat
+  uploadId: 658773
