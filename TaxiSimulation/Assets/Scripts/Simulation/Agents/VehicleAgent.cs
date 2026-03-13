@@ -363,18 +363,19 @@ public abstract class VehicleAgent : Agent
         else
         {
             // Exiting connector onto real lane.
-            // Bypassed when stuck too long to break circular deadlocks.
+            // Always check physical space — prevents overlap even when stuck.
+            if (!destLane.IsSegmentFree(mergePos, Length))
+            {
+                Speed      = 0;
+                Position   = CurrentLane.Edge.Length - 0.05f;
+                _waitTime += dt;
+                if (_waitTime >= STUCK_THRESHOLD) LogStuck();
+                return;
+            }
+
+            // Skip braking-gap check when stuck (breaks circular deadlocks).
             if (!IsStuck)
             {
-                if (!destLane.IsSegmentFree(mergePos, Length))
-                {
-                    Speed      = 0;
-                    Position   = CurrentLane.Edge.Length - 0.05f;
-                    _waitTime += dt;
-                    if (_waitTime >= STUCK_THRESHOLD) LogStuck();
-                    return;
-                }
-
                 var aheadInDest = destLane.GetVehicleAheadAt(mergePos + Length);
                 if (aheadInDest != null)
                 {
