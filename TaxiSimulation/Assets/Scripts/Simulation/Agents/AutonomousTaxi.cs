@@ -1,130 +1,271 @@
 using System;
 using System.Collections.Generic;
 
-public enum TaxiState
-{
-    Idle,
-    EnRoute,
-    Carrying
-}
+public enum TaxiState { Idle, EnRouteToPickup, Carrying }
 
+/// <summary>
+/// Path-following taxi. Follows a pre-computed sequence of LaneLinks
+/// supplied by FleetManager. Picks up and drops off passengers.
+/// </summary>
 public class AutonomousTaxi : VehicleAgent
 {
-    public TaxiState  State     = TaxiState.Idle;
-    public Pedestrian Passenger = null;
+    readonly Queue<LaneLink> path = new();
 
-    Queue<TrafficEdge> plannedPath = new();
+    TrafficNode pickupNode;
+    TrafficNode dropoffNode;
+
+    // Passenger assigned (en route to pick up) but not yet boarded.
+    // Kept separate from Passenger so State = EnRouteToPickup, not Carrying.
+    Pedestrian _assignedPassenger;
+
+    // Number of path links in leg 2 (pickup→destination).
+    // Used to show per-leg distance: leg1 remaining = path.Count - _leg2LinkCount.
+    int _leg2LinkCount;
 
     float desiredSpeed;
-    float acceleration = 5f;
+    float acceleration = 4f;
+
+    // ---------------------------------------------------------------
+    public Pedestrian Passenger    { get; private set; }
+    public bool       HasPassenger => Passenger != null;
+
+    /// <summary>True only when idle: no passenger on board, none assigned, no path.</summary>
+    public bool IsAvailable => !HasPassenger && _assignedPassenger == null && path.Count == 0;
+
+    public TaxiState State =>
+        HasPassenger   ? TaxiState.Carrying       :
+        IsAvailable    ? TaxiState.Idle            :
+                         TaxiState.EnRouteToPickup;
+
+    public TrafficNode PickupNodeTarget  => pickupNode;
+    public TrafficNode DropoffNodeTarget => dropoffNode;
+
+    public TrafficNode CurrentNode => CurrentLane?.Edge.from;
+
+    /// <summary>
+    /// Approximate remaining path distance in logical metres.
+    /// Skips connector contribution to avoid brief increases at intersections.
+    /// </summary>
+    public float EstimatedDistanceRemaining
+    {
+        get
+        {
+            // Skip connector distance only when Carrying (short connectors inflate the
+            // reading). When EnRouteToPickup, the final connector IS the last hop to
+            // the passenger, so include its remaining distance to avoid showing < 10m
+            // while still a few meters away.
+            float d = (OnConnector && State == TaxiState.Carrying) ? 0f : DistanceToEdgeEnd;
+
+            // EnRouteToPickup: only count leg-1 links (path.Count - _leg2LinkCount).
+            // Carrying: count all remaining links (they are all leg-2).
+            // This ensures the display reaches ~0 at pickup, then resets to destination distance.
+            int limit = (State == TaxiState.EnRouteToPickup)
+                ? System.Math.Max(0, path.Count - _leg2LinkCount)
+                : int.MaxValue;
+
+            int i = 0;
+            foreach (var link in path)
+            {
+                if (i >= limit) break;
+                if (!link.DestLane.Edge.IsConnector)
+                    d += link.DestLane.Edge.Length;
+                i++;
+            }
+            return d;
+        }
+    }
+
+    // ---------------------------------------------------------------
+    public void AssignPath(Queue<LaneLink> links, Pedestrian passenger, int leg2LinkCount = 0)
+    {
+        path.Clear();
+        foreach (var l in links) path.Enqueue(l);
+
+        // Do NOT set Passenger here — the taxi hasn't boarded anyone yet.
+        // Passenger is set in CheckPassengerEvents when the taxi reaches pickupNode.
+        Passenger          = null;
+        _assignedPassenger = passenger;
+        pickupNode         = passenger.CurrentNode;
+        dropoffNode        = passenger.Destination;
+        _leg2LinkCount     = leg2LinkCount;
+    }
+
+    public void AssignPath(Queue<LaneLink> links)
+    {
+        path.Clear();
+        foreach (var l in links) path.Enqueue(l);
+        pickupNode  = null;
+        dropoffNode = null;
+    }
 
     // ---------------------------------------------------------------
     public override void Perceive(World world)
     {
         UpdatePerception(world);
+        CheckPassengerEvents();
+    }
 
-        // Passenger cancellation check
-        if (Passenger != null && Passenger.State == PedestrianState.Cancelled)
+    void CheckPassengerEvents()
+    {
+        // If the assigned passenger cancelled while we were en route, release them.
+        if (_assignedPassenger != null &&
+            (_assignedPassenger.State == PedestrianState.Cancelled ||
+             _assignedPassenger.State == PedestrianState.Done))
         {
-            Passenger = null;
-            State     = TaxiState.Idle;
-            plannedPath.Clear();
+            _assignedPassenger = null;
+            pickupNode         = null;
+            path.Clear();
+            return;
         }
 
-        // Pickup check — fires when taxi has just crossed the passenger's node (leg 2 starts here)
-        if (State == TaxiState.EnRoute && Passenger != null)
+        if (TargetNode == null) return;
+
+        // Pickup: taxi has arrived at the passenger's node
+        if (pickupNode != null && TargetNode == pickupNode && DistanceToEdgeEnd <= 1f)
         {
-            if (CurrentLane.Edge.from == Passenger.CurrentNode)
+            _assignedPassenger?.OnPickedUp();
+            Passenger          = _assignedPassenger;
+            _assignedPassenger = null;
+            pickupNode         = null;
+        }
+
+        // Dropoff: taxi has arrived at the destination node
+        if (dropoffNode != null && TargetNode == dropoffNode && DistanceToEdgeEnd <= 1f)
+        {
+            Passenger?.OnDroppedOff();
+            Passenger   = null;
+            dropoffNode = null;
+        }
+    }
+
+    /// <summary>
+    /// Follow pre-computed link queue.
+    /// On a connector: always take the single onward link.
+    /// On a real lane:
+    ///   1. Consume stale path entries whose destination we already reached.
+    ///   2. Dequeue if the next entry matches the current lane.
+    ///   3. If a sibling lane is needed, find an equivalent or trigger lane change.
+    ///   4. Wander if no path.
+    /// </summary>
+    protected override LaneLink SelectNextLink(NavigationGraph graph)
+    {
+        if (OnConnector)
+        {
+            var connLinks = graph.GetLinksFrom(CurrentLane);
+            return connLinks.Count > 0 ? connLinks[0] : null;
+        }
+
+        if (path.Count > 0)
+        {
+            // Drain stale entries (taxi arrived via sibling connector)
+            while (path.Count > 0)
             {
-                Passenger.OnPickedUp();
-                State = TaxiState.Carrying;
+                var peek = path.Peek();
+
+                if (peek.DestLane.Edge == CurrentLane.Edge)
+                { path.Dequeue(); continue; }
+
+                if (peek.DestLane.Edge.IsConnector)
+                {
+                    var onward = graph.GetLinksFrom(peek.DestLane);
+                    if (onward.Count > 0 && onward[0].DestLane.Edge == CurrentLane.Edge)
+                    { path.Dequeue(); continue; }
+                }
+
+                break;
+            }
+
+            if (path.Count == 0) goto wander;
+
+            var next = path.Peek();
+
+            if (next.SourceLane == CurrentLane)
+                return path.Dequeue();
+
+            if (next.SourceLane.Edge == CurrentLane.Edge)
+            {
+                var targetEdge = next.DestLane.Edge;
+                foreach (var link in graph.GetLinksFrom(CurrentLane))
+                {
+                    if (link.DestLane.Edge == targetEdge)
+                    { path.Dequeue(); return link; }
+
+                    if (link.DestLane.Edge.IsConnector)
+                    {
+                        var onward = graph.GetLinksFrom(link.DestLane);
+                        if (onward.Count > 0 && onward[0].DestLane.Edge == targetEdge)
+                        { path.Dequeue(); return link; }
+                    }
+                }
+
+                return next; // sets DesiredLane for lane change
             }
         }
 
-        // Dropoff check — fires when taxi is on the edge leading into the destination
-        if (State == TaxiState.Carrying && Passenger != null)
-        {
-            if (CurrentLane.Edge.to == Passenger.Destination)
-            {
-                Passenger.OnDroppedOff();
-                world.FleetManager?.OnTaxiAvailable(this);
-                Passenger = null;
-                State     = TaxiState.Idle;
-                plannedPath.Clear();
-            }
-        }
-    }
+        wander:
+        var links = graph.GetLinksFrom(CurrentLane);
+        if (links.Count > 0)
+            return links[rng.Next(links.Count)];
 
-    protected override TrafficEdge SelectNextEdge(TrafficNode node)
-    {
-        if (plannedPath.Count > 0)
+        foreach (var lane in CurrentLane.Edge.Lanes)
         {
-            var next = plannedPath.Peek();
-            if (next.from == node)
-                return plannedPath.Dequeue();
-
-            // Path desynced — taxi is at a node that doesn't match the next planned edge
-            UnityEngine.Debug.LogWarning(
-                $"[Taxi{Id}] Path desync at node {node.id}: " +
-                $"expected edge from {next.from.id}, resetting to Idle.");
-            plannedPath.Clear();
-            Passenger = null;
-            State     = TaxiState.Idle;
+            var fallback = graph.GetLinksFrom(lane);
+            if (fallback.Count > 0)
+                return fallback[rng.Next(fallback.Count)];
         }
 
-        // Idle — roam randomly, but only via lanes reachable from the current lane
-        if (node.Outgoing.Count == 0) return null;
-
-        var reachable = new System.Collections.Generic.List<TrafficEdge>();
-        foreach (var edge in node.Outgoing)
-        {
-            if (edge.EntryLaneRequired < 0 || edge.EntryLaneRequired == LaneNumber)
-                reachable.Add(edge);
-        }
-
-        var candidates = reachable.Count > 0 ? reachable : node.Outgoing;
-        return candidates[rng.Next(candidates.Count)];
+        return null;
     }
-
-    // ---------------------------------------------------------------
-    public void AssignPath(Queue<TrafficEdge> path, Pedestrian passenger)
-    {
-        plannedPath = path;
-        Passenger   = passenger;
-        State       = TaxiState.EnRoute;
-    }
-
-    public bool        IsAvailable => State == TaxiState.Idle;
-    public TrafficNode CurrentNode => CurrentLane?.Edge.to;
 
     // ---------------------------------------------------------------
     public override void Deliberate(World world)
     {
-        // Force lane change when a required entry lane doesn't match the current one
-        if (NeedsEntryLaneChange && !CurrentLane.Edge.IsConnection)
-            TryChangeLane(RequiredLane, 4f);
-
+        ConsiderPathLaneChange();
         ChooseSpeed(world);
+    }
+
+    void ConsiderPathLaneChange()
+    {
+        if (IsChangingLane || OnConnector) return;
+        if (DesiredLane < 0 || DesiredLane == LaneNumber) return;
+        if (CurrentLane.Edge.Lanes.Count < 2) return;
+
+        int dir    = DesiredLane > LaneNumber ? 1 : -1;
+        int target = LaneNumber + dir;
+        BeginLaneChange(target);
     }
 
     void ChooseSpeed(World world)
     {
-        desiredSpeed = CurrentLane.Edge.SpeedLimit * (1000f / 3600f);
+        float speedLimit = TrafficLaw.SpeedLimitMs(this);
+        desiredSpeed     = speedLimit;
 
-        if (GapAhead < 8f && AheadOnLane != null)
+        if (GapAhead < 15f && AheadOnLane != null)
         {
-            float followFactor = Math.Max(0f, GapAhead / 8f);
-            desiredSpeed = Math.Min(desiredSpeed, AheadOnLane.Speed * followFactor);
+            float f  = Math.Max(0f, GapAhead / 15f);
+            desiredSpeed = Math.Min(desiredSpeed, AheadOnLane.Speed * f);
         }
 
-        if (TrafficLaw.MustYieldToRoundabout(this) &&
-            TrafficLaw.IsRoundaboutOccupied(this, world.Agents))
+        if (IsChangingLane)
+            desiredSpeed *= 0.85f;
+
+        if (DesiredLane >= 0 && DesiredLane != LaneNumber)
         {
-            desiredSpeed = Math.Min(desiredSpeed, ComputeBrakingSpeed(DistanceToEnd));
+            float urgency = 1f - Math.Min(1f, DistanceToEnd / CurrentLane.Edge.Length);
+            if (urgency > 0.5f)
+                desiredSpeed *= 1f - (urgency - 0.5f) * 0.8f;
         }
+
+        // Junction entry guard — skipped when stuck to break circular deadlocks
+        float junctionCap = IsStuck ? float.MaxValue : JunctionEntryCap(world.Navigation);
+        desiredSpeed = Math.Min(desiredSpeed, junctionCap);
 
         desiredSpeed = ApplyBrakingConstraints(desiredSpeed);
-
-        Speed = MoveTowards(Speed, desiredSpeed, acceleration * world.DeltaTime);
+        Speed        = MoveTowards(Speed, desiredSpeed, acceleration * world.DeltaTime);
     }
+
+    public override void Act(World world) => Move(world);
+
+    public void PickUp(Pedestrian passenger) => Passenger = passenger;
+    public void DropOff() { Passenger = null; dropoffNode = null; }
 }

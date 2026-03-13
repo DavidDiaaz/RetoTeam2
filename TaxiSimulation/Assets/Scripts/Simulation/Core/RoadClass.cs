@@ -4,7 +4,8 @@ public enum RoadClass
     Collector  = 1,
     Arterial   = 2,
     Highway    = 3,
-    Roundabout = 4
+    Roundabout = 4,
+    Connector  = 5   // synthetic: junction-bridging lanes created by NavGraphBuilder
 }
 
 public static class RoadClassInfo
@@ -16,6 +17,7 @@ public static class RoadClassInfo
         RoadClass.Arterial   => 70,
         RoadClass.Highway    => 100,
         RoadClass.Roundabout => 20,
+        RoadClass.Connector  => 20,  // slow through junctions
         _                    => 30
     };
 
@@ -26,6 +28,7 @@ public static class RoadClassInfo
         RoadClass.Arterial   => 3,
         RoadClass.Highway    => 4,
         RoadClass.Roundabout => 1,
+        RoadClass.Connector  => 1,   // always single-lane
         _                    => 1
     };
 
@@ -36,6 +39,7 @@ public static class RoadClassInfo
         RoadClass.Arterial   => 2,
         RoadClass.Highway    => 3,
         RoadClass.Roundabout => 4,
+        RoadClass.Connector  => 0,   // inherits from source road via JunctionEntryCap yield logic
         _                    => 0
     };
 }

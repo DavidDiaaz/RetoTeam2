@@ -1,7 +1,9 @@
+using UnityEngine;
+
 public enum PedestrianState
 {
     Waiting,
-    Matched,   // taxi assigned, not yet picked up
+    Matched,    // taxi assigned, en route to pick up
     Riding,
     Done,
     Cancelled
@@ -14,13 +16,18 @@ public class Pedestrian : Agent
     public PedestrianState State          = PedestrianState.Waiting;
     public float           ToleranceTimer;
 
-    bool requestSent = false;
+    /// <summary>World-space position where this pedestrian stands (set by SimulationManager).</summary>
+    public Vector3 WorldPosition;
 
-    public Pedestrian(TrafficNode currentNode, TrafficNode destination, float toleranceSeconds)
+    bool _requestSent = false;
+
+    public Pedestrian(TrafficNode currentNode, TrafficNode destination,
+                      float toleranceSeconds, Vector3 worldPosition)
     {
         CurrentNode    = currentNode;
         Destination    = destination;
         ToleranceTimer = toleranceSeconds;
+        WorldPosition  = worldPosition;
     }
 
     public override void Perceive(World world) { }
@@ -30,7 +37,6 @@ public class Pedestrian : Agent
         if (State == PedestrianState.Waiting || State == PedestrianState.Matched)
         {
             ToleranceTimer -= world.DeltaTime;
-
             if (ToleranceTimer <= 0f)
             {
                 State = PedestrianState.Cancelled;
@@ -38,17 +44,16 @@ public class Pedestrian : Agent
             }
         }
 
-        // Send ride request once
-        if (!requestSent && State == PedestrianState.Waiting)
+        if (!_requestSent && State == PedestrianState.Waiting)
         {
-            requestSent = true;
+            _requestSent = true;
             world.FleetManager?.RequestRide(this);
         }
     }
 
     public override void Act(World world) { }
 
-    public void OnMatched()   => State = PedestrianState.Matched;
-    public void OnPickedUp()  => State = PedestrianState.Riding;
+    public void OnMatched()    => State = PedestrianState.Matched;
+    public void OnPickedUp()   => State = PedestrianState.Riding;
     public void OnDroppedOff() => State = PedestrianState.Done;
 }

@@ -1,45 +1,36 @@
 using System;
 
+/// <summary>
+/// Driving personality profile. Randomised per vehicle.
+///
+/// MinFollowingDistance : absolute minimum gap (metres) — never go below this
+/// DesiredTimeGap       : gap in seconds at current speed the driver wants to maintain
+/// DesiredSpeedFactor   : fraction of the speed limit the driver naturally travels at
+/// </summary>
 public class Profile
 {
-    public float DesiredSpeedFactor;
-    public float MinFollowingDistance;
-    public float LaneChangeAggression;
-    public float Kindness;
+    public float MinFollowingDistance { get; private set; }
+    public float DesiredTimeGap       { get; private set; }
+    public float DesiredSpeedFactor   { get; private set; }
 
-    /// <summary>
-    /// 0 = ignores traffic laws entirely.
-    /// 1 = always follows the law strictly.
-    /// Affects right-of-way priority bonus and speed limit compliance.
-    /// </summary>
-    public float LawAbidance;
+    Profile() { }
 
     static readonly Random rng = new Random();
 
-    public static Profile RandomProfile() => new Profile
+    public static Profile RandomProfile()
     {
-        DesiredSpeedFactor   = 0.7f + (float)rng.NextDouble() * 0.6f,  // 0.7–1.3
-        MinFollowingDistance = 4f   + (float)rng.NextDouble() * 4f,    // 4–8m
-        LaneChangeAggression = (float)rng.NextDouble(),                  // 0–1
-        Kindness             = (float)rng.NextDouble(),                  // 0–1
-        LawAbidance          = 0.3f + (float)rng.NextDouble() * 0.7f,  // 0.3–1.0
-    };
+        // Tailgater  →  MinGap 1 m,  TimeGap 0.8 s,  Speed 105%
+        // Average    →  MinGap 2 m,  TimeGap 1.5 s,  Speed 100%
+        // Cautious   →  MinGap 4 m,  TimeGap 2.5 s,  Speed  90%
+        float t = (float)rng.NextDouble(); // 0 = aggressive, 1 = cautious
 
-    public static Profile Aggressive() => new Profile
-    {
-        DesiredSpeedFactor   = 1.3f,
-        MinFollowingDistance = 4f,
-        LaneChangeAggression = 0.9f,
-        Kindness             = 0.1f,
-        LawAbidance          = 0.2f
-    };
+        return new Profile
+        {
+            MinFollowingDistance = Lerp(1f,   4f,   t),
+            DesiredTimeGap       = Lerp(0.8f, 2.5f, t),
+            DesiredSpeedFactor   = Lerp(1.05f, 0.88f, t)
+        };
+    }
 
-    public static Profile Cautious() => new Profile
-    {
-        DesiredSpeedFactor   = 0.8f,
-        MinFollowingDistance = 8f,
-        LaneChangeAggression = 0.1f,
-        Kindness             = 0.9f,
-        LawAbidance          = 0.95f
-    };
+    static float Lerp(float a, float b, float t) => a + (b - a) * t;
 }

@@ -1,33 +1,16 @@
 using System.Collections.Generic;
 
+/// <summary>
+/// Junction point between road segments.
+/// In the new model, nodes are purely structural — they mark where
+/// segments meet. Contention is handled by lane physics, not node logic.
+/// </summary>
 public class TrafficNode
 {
-    public int               id;
-    public List<TrafficEdge> Outgoing  = new();
+    public int    id;
+    public string Label    = "";
+    public List<TrafficEdge> Outgoing = new();
     public TrafficLight      Light;
-    // ---------------------------------------------------------------
-    // Intersection state
-    // ---------------------------------------------------------------
 
-    // Vehicle physically inside the intersection right now
-    public VehicleAgent OccupiedBy = null;
-
-    // Vehicles stopped at their edge end wanting to enter this node
-    // Populated during Perceive, cleared each tick before Perceive
-
-    public List<VehicleAgent> Contenders = new();
-
-    public TrafficNode(int id)
-    {
-        this.id = id;
-    }
-
-    public bool IsBlocked => OccupiedBy != null;
-
-    public void ClearContenders() => Contenders.Clear();
-
-    public void RegisterContender(VehicleAgent v)
-    {
-        Contenders.Add(v); // HashSet.Add ignores duplicates
-    }
+    public TrafficNode(int id) { this.id = id; }
 }
