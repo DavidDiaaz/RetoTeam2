@@ -322,8 +322,9 @@ public abstract class VehicleAgent : Agent
     {
         if (TargetLink == null)
         {
-            Speed    = 0;
-            Position = CurrentLane.Edge.Length;
+            Speed     = 0;
+            Position  = CurrentLane.Edge.Length;
+            _waitTime += dt;   // enables IsStuck to fire and breaks the permanent halt
             return;
         }
 
